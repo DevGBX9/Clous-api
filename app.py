@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Instagram Username Checker - On-Demand API
-==========================================
+Instagram Username Checker - Dynamic Proxy API ONLY
+====================================================
 
-This script runs a Flask API that checks for available 5-character Instagram usernames.
-It is designed to be deployed on serverless/container environments like Render.
+Uses PubProxy API exclusively with maximum speed optimization.
 
-Features:
-- On-Demand Search: Triggered via /search endpoint.
-- High Concurrency: Uses ThreadPoolExecutor for rapid checking.
-- Smart Stopping: Stops immediately upon finding a user, hitting a rate limit, or timing out.
-- Decoupled Frontend: Serves a JSON API; frontend logic is in index.html.
-- Anonymity: Rotating Proxies, Random User-Agents, Dynamic Device IDs.
-
-Author: @GBX_9 (Original Helper)
+Author: @GBX_9
 """
 
 import os
@@ -23,12 +15,10 @@ import time
 import random
 import asyncio
 import httpx
-import itertools
 from uuid import uuid4
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-# Prevent Python from writing __pycache__ bytecode files
 sys.dont_write_bytecode = True
 
 # ==========================================
@@ -38,10 +28,15 @@ CONFIG = {
     "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
     "TIMEOUT_SECONDS": 30,
     "FIXED_EMAIL": "abdo1@gmail.com",
-    "MAX_CONCURRENCY": 100,  # Increased for async
+    "MAX_CONCURRENCY": 100,
+    "PROXY_REFRESH_INTERVAL": 15,
+    # Multiple proxy APIs for redundancy and more proxies
+    "PROXY_APIS": [
+        "http://pubproxy.com/api/proxy?limit=20&format=txt&http=true&last_check=5",
+        "http://pubproxy.com/api/proxy?limit=20&format=txt&https=true&last_check=5",
+    ],
 }
 
-# Values for username generation
 CHARS = {
     "LETTERS": 'abcdefghijklmnopqrstuvwxyz',
     "DIGITS": '0123456789',
@@ -49,25 +44,6 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-# Rotating Proxies (Format: http://user:pass@ip:port)
-PROXIES_LIST = [
-    "http://nfolpofx:x9k8uibuyggr@142.111.48.253:7030",
-    "http://nfolpofx:x9k8uibuyggr@23.95.150.145:6114",
-    "http://nfolpofx:x9k8uibuyggr@198.23.239.134:6540",
-    "http://nfolpofx:x9k8uibuyggr@107.172.163.27:6543",
-    "http://nfolpofx:x9k8uibuyggr@198.105.121.200:6462",
-    "http://nfolpofx:x9k8uibuyggr@64.137.96.74:6641",
-    "http://nfolpofx:x9k8uibuyggr@84.247.60.125:6095",
-    "http://nfolpofx:x9k8uibuyggr@216.10.27.159:6837",
-    "http://nfolpofx:x9k8uibuyggr@23.26.71.145:5628",
-    "http://nfolpofx:x9k8uibuyggr@23.27.208.120:5830",
-]
-
-# Random iterator to pick proxies efficiently
-# We use random.choice mostly, but cycle can be used for round-robin
-proxy_pool = itertools.cycle(PROXIES_LIST)
-
-# Expanded User Agents
 USER_AGENTS = [
     'Instagram 6.12.1 Android (30/11; 480dpi; 1080x2298; HONOR; ANY-LX2; HNANY-Q1; qcom; en_IQ)',
     'Instagram 10.20.0 Android (28/9; 420dpi; 1080x1920; Samsung; SM-G930F; heroqltesq; qcom; en_US)',
@@ -86,11 +62,65 @@ HEADERS_TEMPLATE = {
     'Accept-Encoding': 'gzip',
 }
 
-# ==========================================
-#              FLASK SETUP
-# ==========================================
 app = Flask(__name__)
-CORS(app)  # Enable Cross-Origin Resource Sharing for decoupled frontend access
+CORS(app)
+
+
+# ==========================================
+#    ULTRA-FAST ASYNC PROXY FETCHER
+# ==========================================
+
+async def fetch_proxies_ultra_fast():
+    """
+    Fetch proxies from multiple APIs concurrently using httpx async.
+    Much faster than requests library.
+    """
+    all_proxies = []
+    
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        # Fetch from all APIs concurrently
+        tasks = []
+        for api_url in CONFIG["PROXY_APIS"]:
+            tasks.append(client.get(api_url))
+        
+        # Wait for all responses
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for response in responses:
+            if isinstance(response, Exception):
+                continue
+            try:
+                if response.status_code == 200:
+                    proxy_text = response.text.strip()
+                    if proxy_text:
+                        for line in proxy_text.split('\n'):
+                            line = line.strip()
+                            if line and line not in all_proxies:
+                                if not line.startswith('http'):
+                                    all_proxies.append(f"http://{line}")
+                                else:
+                                    all_proxies.append(line)
+            except Exception:
+                continue
+    
+    print(f"[ProxyFetcher] Got {len(all_proxies)} proxies")
+    return all_proxies
+
+
+async def create_clients_fast(proxy_urls):
+    """Create httpx clients for all proxies concurrently."""
+    clients = []
+    for proxy_url in proxy_urls:
+        try:
+            client = httpx.AsyncClient(
+                proxy=proxy_url, 
+                timeout=2.0,  # Short timeout for speed
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+            )
+            clients.append(client)
+        except Exception:
+            continue
+    return clients
 
 
 # ==========================================
@@ -98,48 +128,32 @@ CORS(app)  # Enable Cross-Origin Resource Sharing for decoupled frontend access
 # ==========================================
 
 class AutoUsernameGenerator:
-    """
-    Responsible for generating valid 5-character Instagram usernames.
-    """
     def __init__(self):
         self.generated_usernames = set()
     
     def is_valid_instagram_username(self, username):
-        """
-        Validates username against Instagram's rules.
-        """
         if len(username) != 5:
             return False
-        
         allowed_chars = set(CHARS["ALL_VALID"] + CHARS["SYMBOLS"])
         if not all(char in allowed_chars for char in username):
             return False
-        
         if username.startswith('.') or username.endswith('.'):
             return False
-        
         if '..' in username or '._' in username or '_.' in username:
             return False
-        
         if username[0] in CHARS["DIGITS"]:
             return False
-        
         return True
     
     def generate(self):
-        """
-        Generates a unique, compliant 5-char username.
-        """
         max_attempts = 10
         for _ in range(max_attempts):
             username = random.choice(CHARS["LETTERS"])
             username += ''.join(random.choices(CHARS["ALL_VALID"], k=4))
-            
             if (username not in self.generated_usernames and 
                 self.is_valid_instagram_username(username)):
                 self.generated_usernames.add(username)
                 return username
-        
         timestamp = int(time.time() * 1000) % 10000
         username = f"{random.choice(CHARS['LETTERS'])}{timestamp:04d}"[:5]
         self.generated_usernames.add(username)
@@ -147,15 +161,11 @@ class AutoUsernameGenerator:
 
 
 class AutoInstagramChecker:
-    """
-    Handles the HTTP communication with Instagram APIs.
-    Uses Rotating Proxies and Random User Agents.
-    """
     def __init__(self, clients):
         self.clients = clients
+        self.idx = 0
     
     def _get_random_headers(self):
-        """Generates headers with randomized device bandwidth/connection type."""
         headers = HEADERS_TEMPLATE.copy()
         headers['User-Agent'] = f'Instagram {random.choice(USER_AGENTS)}'
         headers['X-IG-Connection-Type'] = random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G'])
@@ -165,13 +175,13 @@ class AutoInstagramChecker:
         return headers
 
     async def check_username_availability(self, username):
-        """
-        Checks availability of a username using a random proxy client.
-        """
-        # Pick a random client from the pool
-        client = random.choice(self.clients)
+        if not self.clients:
+            return False, "", "no_client"
+        
+        # Round-robin for even distribution
+        client = self.clients[self.idx % len(self.clients)]
+        self.idx += 1
 
-        # Generate Fresh Device IDs for total anonymity
         data = {
             "email": CONFIG["FIXED_EMAIL"],
             "username": username,
@@ -181,7 +191,6 @@ class AutoInstagramChecker:
         }
         
         try:
-            # Short timeout (3s)
             response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"], 
                 headers=self._get_random_headers(), 
@@ -196,106 +205,114 @@ class AutoInstagramChecker:
             return is_available, response_text, None
             
         except (httpx.RequestError, httpx.TimeoutException):
-            # Proxy error or timeout is common, treat as not found/skip to keep moving
             return False, "", "connection_error"
 
 
 class SearchSession:
-    """
-    Orchestrates a single on-demand search request.
-    """
     def __init__(self):
         self.generator = AutoUsernameGenerator()
-        
-        # Result State
         self.found_username = None
-        self.result_reason = "timeout" 
-        
-        # Concurrency Control
+        self.result_reason = "timeout"
         self.should_stop = False
         self.max_concurrency = CONFIG["MAX_CONCURRENCY"]
         self.start_time = 0
+        self.last_refresh = 0
+        self.clients = []
+        self.refresh_lock = asyncio.Lock()
+
+    async def _refresh_proxies(self):
+        """Refresh proxies from API."""
+        async with self.refresh_lock:
+            if time.time() - self.last_refresh < 5:  # Prevent spam
+                return
+            
+            print("[Session] Refreshing proxies...")
+            new_proxies = await fetch_proxies_ultra_fast()
+            
+            if new_proxies:
+                # Close old clients
+                for c in self.clients:
+                    try:
+                        await c.aclose()
+                    except:
+                        pass
+                
+                # Create new clients
+                self.clients = await create_clients_fast(new_proxies)
+                self.last_refresh = time.time()
+                print(f"[Session] Now using {len(self.clients)} clients")
 
     async def _worker(self, checker):
-        """Code running inside each async worker."""
         while not self.should_stop:
-            # 1. Check Timeout
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
                 self.should_stop = True
                 return
 
-            # 2. Generate
+            # Check if refresh needed (15s rule)
+            if time.time() - self.last_refresh > CONFIG["PROXY_REFRESH_INTERVAL"]:
+                await self._refresh_proxies()
+
             username = self.generator.generate()
-            
-            # 3. Check
             is_available, _, error = await checker.check_username_availability(username)
             
-            # 4. Handle Result
             if self.should_stop:
-                return 
+                return
 
-            if error == "rate_limit":
-                # With proxies, a single 429 might not mean global stop.
-                # We continue with other proxies.
-                pass 
-            
             if is_available:
                 self.found_username = username
                 self.result_reason = "success"
                 self.should_stop = True
                 return
             
-            # Minimal yield
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0)  # Yield without delay
 
     async def run(self):
-        """Starts the async task pool."""
         self.start_time = time.time()
         
-        # Initialize clients for each proxy
-        # We assume PROXIES_LIST has valid proxy URLs
-        clients = []
-        for proxy_url in PROXIES_LIST:
-            try:
-                # httpx.AsyncClient manages the connection pool for this proxy
-                client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
-                clients.append(client)
-            except Exception:
-                continue
+        # Fetch proxies from API
+        print("[Session] Fetching proxies from API...")
+        proxy_urls = await fetch_proxies_ultra_fast()
         
-        if not clients:
+        if not proxy_urls:
             return {
                 "status": "failed",
                 "username": None,
-                "reason": "no_proxies_available",
-                "duration": 0
+                "reason": "no_proxies_from_api",
+                "duration": round(time.time() - self.start_time, 2)
+            }
+        
+        self.clients = await create_clients_fast(proxy_urls)
+        self.last_refresh = time.time()
+        
+        if not self.clients:
+            return {
+                "status": "failed",
+                "username": None,
+                "reason": "clients_creation_failed",
+                "duration": round(time.time() - self.start_time, 2)
             }
 
-        checker = AutoInstagramChecker(clients)
+        print(f"[Session] Starting with {len(self.clients)} clients")
+        checker = AutoInstagramChecker(self.clients)
         
-        # Launch workers
         tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
         
-        # Wait for completion or stop
         while not self.should_stop:
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
                 self.should_stop = True
                 break
-            
-            # Check if all tasks finished (e.g. if we had limited attempts, but here we loop forever)
-            # Actually, we should check if we found something
             if self.found_username:
                 break
-                
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05)
 
-        # Ensure all tasks stop
         self.should_stop = True
         await asyncio.gather(*tasks, return_exceptions=True)
         
-        # Cleanup clients
-        for c in clients:
-            await c.aclose()
+        for c in self.clients:
+            try:
+                await c.aclose()
+            except:
+                pass
             
         return {
             "status": "success" if self.found_username else "failed",
@@ -311,20 +328,16 @@ class SearchSession:
 
 @app.route('/')
 def home():
-    """Root endpoint for health checks."""
     return jsonify({
         "status": "online",
-        "message": "Instagram Checker API is running with Proxy Rotation.",
-        "usage": "Send GET request to /search to find a user."
+        "message": "Instagram Checker - Dynamic Proxy API Only",
+        "usage": "GET /search"
     })
 
 @app.route('/search')
-async def search():
-    """
-    Triggers a search session.
-    """
+def search():
     session = SearchSession()
-    result = await session.run()
+    result = asyncio.run(session.run())
     return jsonify(result)
 
 
