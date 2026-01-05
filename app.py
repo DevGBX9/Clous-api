@@ -21,11 +21,10 @@ import os
 import sys
 import time
 import random
-import threading
-import requests
+import asyncio
+import httpx
 import itertools
 from uuid import uuid4
-from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify
 from flask_cors import CORS
 
@@ -39,7 +38,7 @@ CONFIG = {
     "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
     "TIMEOUT_SECONDS": 30,
     "FIXED_EMAIL": "abdo1@gmail.com",
-    "MAX_THREADS_CAP": 50,  # Cap threads to prevent server overload
+    "MAX_CONCURRENCY": 100,  # Increased for async
 }
 
 # Values for username generation
@@ -52,16 +51,16 @@ CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
 # Rotating Proxies (Format: http://user:pass@ip:port)
 PROXIES_LIST = [
-    "http://qfzqxqrh:u9o91130s592@142.111.48.253:7030",
-    "http://qfzqxqrh:u9o91130s592@31.59.20.176:6754",
-    "http://qfzqxqrh:u9o91130s592@23.95.150.145:6114",
-    "http://qfzqxqrh:u9o91130s592@198.23.239.134:6540",
-    "http://qfzqxqrh:u9o91130s592@107.172.163.27:6543",
-    "http://qfzqxqrh:u9o91130s592@198.105.121.200:6462",
-    "http://qfzqxqrh:u9o91130s592@64.137.96.74:6641",
-    "http://qfzqxqrh:u9o91130s592@84.247.60.125:6095",
-    "http://qfzqxqrh:u9o91130s592@216.10.27.159:6837",
-    "http://qfzqxqrh:u9o91130s592@142.111.67.146:5611",
+    "http://nfolpofx:x9k8uibuyggr@142.111.48.253:7030",
+    "http://nfolpofx:x9k8uibuyggr@23.95.150.145:6114",
+    "http://nfolpofx:x9k8uibuyggr@198.23.239.134:6540",
+    "http://nfolpofx:x9k8uibuyggr@107.172.163.27:6543",
+    "http://nfolpofx:x9k8uibuyggr@198.105.121.200:6462",
+    "http://nfolpofx:x9k8uibuyggr@64.137.96.74:6641",
+    "http://nfolpofx:x9k8uibuyggr@84.247.60.125:6095",
+    "http://nfolpofx:x9k8uibuyggr@216.10.27.159:6837",
+    "http://nfolpofx:x9k8uibuyggr@23.26.71.145:5628",
+    "http://nfolpofx:x9k8uibuyggr@23.27.208.120:5830",
 ]
 
 # Random iterator to pick proxies efficiently
@@ -152,10 +151,8 @@ class AutoInstagramChecker:
     Handles the HTTP communication with Instagram APIs.
     Uses Rotating Proxies and Random User Agents.
     """
-    def __init__(self):
-        # We generally use a session, but with rotating proxies and identities per request, 
-        # it's often safer to treat each check as a fresh isolated request or rotate session headers.
-        self.session = requests.Session()
+    def __init__(self, clients):
+        self.clients = clients
     
     def _get_random_headers(self):
         """Generates headers with randomized device bandwidth/connection type."""
@@ -166,19 +163,14 @@ class AutoInstagramChecker:
         headers['X-IG-Bandwidth-TotalBytes-B'] = str(random.randint(500000, 5000000))
         headers['X-IG-Bandwidth-TotalTime-MS'] = str(random.randint(50, 500))
         return headers
-    
-    def _get_proxy_dict(self):
-        """Pick a random proxy from the pool."""
-        proxy_url = random.choice(PROXIES_LIST)
-        return {
-            "http": proxy_url,
-            "https": proxy_url
-        }
 
-    def check_username_availability(self, username):
+    async def check_username_availability(self, username):
         """
-        Checks availability of a username using a random proxy.
+        Checks availability of a username using a random proxy client.
         """
+        # Pick a random client from the pool
+        client = random.choice(self.clients)
+
         # Generate Fresh Device IDs for total anonymity
         data = {
             "email": CONFIG["FIXED_EMAIL"],
@@ -189,13 +181,11 @@ class AutoInstagramChecker:
         }
         
         try:
-            # Short timeout (3s) - slightly longer for proxies
-            response = requests.post(
+            # Short timeout (3s)
+            response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"], 
                 headers=self._get_random_headers(), 
-                data=data, 
-                proxies=self._get_proxy_dict(),
-                timeout=3
+                data=data
             )
             response_text = response.text
             
@@ -205,7 +195,7 @@ class AutoInstagramChecker:
             is_available = '"email_is_taken"' in response_text
             return is_available, response_text, None
             
-        except requests.exceptions.RequestException:
+        except (httpx.RequestError, httpx.TimeoutException):
             # Proxy error or timeout is common, treat as not found/skip to keep moving
             return False, "", "connection_error"
 
@@ -216,69 +206,97 @@ class SearchSession:
     """
     def __init__(self):
         self.generator = AutoUsernameGenerator()
-        self.checker = AutoInstagramChecker()
         
         # Result State
         self.found_username = None
         self.result_reason = "timeout" 
         
         # Concurrency Control
-        self.stop_event = threading.Event()
-        self.max_threads = min(CONFIG["MAX_THREADS_CAP"], (os.cpu_count() or 4) * 8)
+        self.should_stop = False
+        self.max_concurrency = CONFIG["MAX_CONCURRENCY"]
         self.start_time = 0
 
-    def _worker(self):
-        """Code running inside each worker thread."""
-        while not self.stop_event.is_set():
+    async def _worker(self, checker):
+        """Code running inside each async worker."""
+        while not self.should_stop:
             # 1. Check Timeout
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
-                self.stop_event.set()
+                self.should_stop = True
                 return
 
             # 2. Generate
             username = self.generator.generate()
             
             # 3. Check
-            is_available, _, error = self.checker.check_username_availability(username)
+            is_available, _, error = await checker.check_username_availability(username)
             
             # 4. Handle Result
-            if self.stop_event.is_set():
+            if self.should_stop:
                 return 
 
             if error == "rate_limit":
-                # With proxies, a single 429 might not mean global stop, 
-                # but if ALL are failing, we might stop. 
-                # For simplicity in this logic: if a proxy is banned, we try another.
-                # We only stop if we suspect a global ban or app-level ban.
-                # But to be safe as per user requirements:
-                # self.result_reason = "rate_limit"
-                # self.stop_event.set()
-                # return
-                pass # Continue with other proxies
+                # With proxies, a single 429 might not mean global stop.
+                # We continue with other proxies.
+                pass 
             
             if is_available:
                 self.found_username = username
                 self.result_reason = "success"
-                self.stop_event.set()
+                self.should_stop = True
                 return
             
-            # Avoid CPU Thrashing
-            time.sleep(0.05)
+            # Minimal yield
+            await asyncio.sleep(0.01)
 
-    def run(self):
-        """Starts the thread pool."""
+    async def run(self):
+        """Starts the async task pool."""
         self.start_time = time.time()
         
-        with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
-            for _ in range(self.max_threads):
-                executor.submit(self._worker)
+        # Initialize clients for each proxy
+        # We assume PROXIES_LIST has valid proxy URLs
+        clients = []
+        for proxy_url in PROXIES_LIST:
+            try:
+                # httpx.AsyncClient manages the connection pool for this proxy
+                client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
+                clients.append(client)
+            except Exception:
+                continue
+        
+        if not clients:
+            return {
+                "status": "failed",
+                "username": None,
+                "reason": "no_proxies_available",
+                "duration": 0
+            }
+
+        checker = AutoInstagramChecker(clients)
+        
+        # Launch workers
+        tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
+        
+        # Wait for completion or stop
+        while not self.should_stop:
+            if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
+                self.should_stop = True
+                break
             
-            while not self.stop_event.is_set():
-                if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
-                    self.stop_event.set()
-                    break
-                time.sleep(0.1)
+            # Check if all tasks finished (e.g. if we had limited attempts, but here we loop forever)
+            # Actually, we should check if we found something
+            if self.found_username:
+                break
                 
+            await asyncio.sleep(0.1)
+
+        # Ensure all tasks stop
+        self.should_stop = True
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Cleanup clients
+        for c in clients:
+            await c.aclose()
+            
         return {
             "status": "success" if self.found_username else "failed",
             "username": self.found_username,
@@ -301,12 +319,12 @@ def home():
     })
 
 @app.route('/search')
-def search():
+async def search():
     """
     Triggers a search session.
     """
     session = SearchSession()
-    result = session.run()
+    result = await session.run()
     return jsonify(result)
 
 
