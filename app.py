@@ -226,6 +226,10 @@ class SearchSession:
         self.stop_event = threading.Event()
         self.max_threads = min(CONFIG["MAX_THREADS_CAP"], (os.cpu_count() or 4) * 8)
         self.start_time = 0
+        
+        # Stats
+        self.total_checks = 0
+        self.lock = threading.Lock()
 
     def _worker(self):
         """Code running inside each worker thread."""
@@ -240,6 +244,10 @@ class SearchSession:
             
             # 3. Check
             is_available, _, error = self.checker.check_username_availability(username)
+            
+            # Update Stats
+            with self.lock:
+                self.total_checks += 1
             
             # 4. Handle Result
             if self.stop_event.is_set():
@@ -279,11 +287,14 @@ class SearchSession:
                     break
                 time.sleep(0.1)
                 
+        duration = round(time.time() - self.start_time, 2)
         return {
             "status": "success" if self.found_username else "failed",
             "username": self.found_username,
             "reason": self.result_reason if not self.found_username else None,
-            "duration": round(time.time() - self.start_time, 2)
+            "duration": duration,
+            "total_checks": self.total_checks,
+            "checks_per_second": round(self.total_checks / duration, 1) if duration > 0 else 0
         }
 
 
