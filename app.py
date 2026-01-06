@@ -39,9 +39,6 @@ CONFIG = {
     "TIMEOUT_SECONDS": 30,
     "FIXED_EMAIL": "abdo1@gmail.com",
     "MAX_CONCURRENCY": 100,  # Increased for async
-    # Webshare Proxy List Download URL or Backconnect Proxy URL
-    # Format: https://proxy.webshare.io/api/v2/proxy/list/download/[TOKEN]/-/any/username/direct/
-    "PROXY_SOURCE": os.environ.get("PROXY_SOURCE", "http://nfolpofx:x9k8uibuyggr@142.111.48.253:7030"), 
 }
 
 # Values for username generation
@@ -52,42 +49,23 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-# Helper to fetch and parse proxies
-async def get_proxies():
-    """
-    Fetches proxies from the source. 
-    If PROXY_SOURCE is a URL, it fetches the list.
-    If it's a single proxy string, it returns it as a list.
-    """
-    source = CONFIG["PROXY_SOURCE"]
-    if not source:
-        return []
-    
-    if source.startswith("http") and "/api/v2/proxy/list/download/" in source:
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(source)
-                if response.status_code == 200:
-                    lines = response.text.strip().splitlines()
-                    proxies = []
-                    for line in lines:
-                        # Webshare usually provides: ip:port:user:pass or user:pass@ip:port
-                        parts = line.strip().split(':')
-                        if len(parts) == 4:
-                            # Format: ip:port:user:pass -> http://user:pass@ip:port
-                            proxies.append(f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}")
-                        elif "@" in line:
-                            proxies.append(f"http://{line}" if not line.startswith("http") else line)
-                    return proxies
-        except Exception as e:
-            print(f"Error fetching proxy list: {e}")
-            return []
-    
-    # Otherwise treat as a single backconnect proxy or comma-separated list
-    return [p.strip() for p in source.split(",") if p.strip()]
+# Rotating Proxies (Format: http://user:pass@ip:port)
+PROXIES_LIST = [
+    "http://nfolpofx:x9k8uibuyggr@142.111.48.253:7030",
+    "http://nfolpofx:x9k8uibuyggr@23.95.150.145:6114",
+    "http://nfolpofx:x9k8uibuyggr@198.23.239.134:6540",
+    "http://nfolpofx:x9k8uibuyggr@107.172.163.27:6543",
+    "http://nfolpofx:x9k8uibuyggr@198.105.121.200:6462",
+    "http://nfolpofx:x9k8uibuyggr@64.137.96.74:6641",
+    "http://nfolpofx:x9k8uibuyggr@84.247.60.125:6095",
+    "http://nfolpofx:x9k8uibuyggr@216.10.27.159:6837",
+    "http://nfolpofx:x9k8uibuyggr@23.26.71.145:5628",
+    "http://nfolpofx:x9k8uibuyggr@23.27.208.120:5830",
+]
 
-# Random iterator to be populated dynamically
-proxy_pool = itertools.cycle([])
+# Random iterator to pick proxies efficiently
+# We use random.choice mostly, but cycle can be used for round-robin
+proxy_pool = itertools.cycle(PROXIES_LIST)
 
 # Expanded User Agents
 USER_AGENTS = [
@@ -275,18 +253,9 @@ class SearchSession:
         self.start_time = time.time()
         
         # Initialize clients for each proxy
-        proxies_to_use = await get_proxies()
-        
-        if not proxies_to_use:
-            return {
-                "status": "failed",
-                "username": None,
-                "reason": "no_proxies_available",
-                "duration": 0
-            }
-
+        # We assume PROXIES_LIST has valid proxy URLs
         clients = []
-        for proxy_url in proxies_to_use:
+        for proxy_url in PROXIES_LIST:
             try:
                 # httpx.AsyncClient manages the connection pool for this proxy
                 client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
