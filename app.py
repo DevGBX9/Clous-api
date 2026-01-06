@@ -49,41 +49,23 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-# File-based Proxy Loading
-PROXIES_FILE = "proxies.txt"
+# Rotating Proxies (Format: http://user:pass@ip:port)
+PROXIES_LIST = [
+    "http://nfolpofx:x9k8uibuyggr@142.111.48.253:7030",
+    "http://nfolpofx:x9k8uibuyggr@23.95.150.145:6114",
+    "http://nfolpofx:x9k8uibuyggr@198.23.239.134:6540",
+    "http://nfolpofx:x9k8uibuyggr@107.172.163.27:6543",
+    "http://nfolpofx:x9k8uibuyggr@198.105.121.200:6462",
+    "http://nfolpofx:x9k8uibuyggr@64.137.96.74:6641",
+    "http://nfolpofx:x9k8uibuyggr@84.247.60.125:6095",
+    "http://nfolpofx:x9k8uibuyggr@216.10.27.159:6837",
+    "http://nfolpofx:x9k8uibuyggr@23.26.71.145:5628",
+    "http://nfolpofx:x9k8uibuyggr@23.27.208.120:5830",
+]
 
-def load_proxies():
-    """Loads proxies from proxies.txt file."""
-    if not os.path.exists(PROXIES_FILE):
-        return []
-    with open(PROXIES_FILE, 'r') as f:
-        return [line.strip() for line in f if line.strip()]
-
-async def check_proxy(proxy_url):
-    """
-    Checks if a proxy is working by making a small request.
-    Returns the proxy_url if working, else None.
-    """
-    try:
-        async with httpx.AsyncClient(proxy=proxy_url, timeout=2.0) as client:
-            response = await client.get("https://www.google.com", follow_redirects=True)
-            if response.status_code == 200:
-                return proxy_url
-    except Exception:
-        pass
-    return None
-
-async def get_working_proxies():
-    """
-    Checks all proxies in parallel and returns those that are working.
-    """
-    all_proxies = load_proxies()
-    if not all_proxies:
-        return []
-    
-    tasks = [check_proxy(p) for p in all_proxies]
-    results = await asyncio.gather(*tasks)
-    return [p for p in results if p is not None]
+# Random iterator to pick proxies efficiently
+# We use random.choice mostly, but cycle can be used for round-robin
+proxy_pool = itertools.cycle(PROXIES_LIST)
 
 # Expanded User Agents
 USER_AGENTS = [
@@ -270,20 +252,10 @@ class SearchSession:
         """Starts the async task pool."""
         self.start_time = time.time()
         
-        # Get only working proxies
-        working_proxies = await get_working_proxies()
-        
-        if not working_proxies:
-            return {
-                "status": "failed",
-                "username": None,
-                "reason": "no_working_proxies_found",
-                "duration": round(time.time() - self.start_time, 2)
-            }
-
-        # Initialize clients for each working proxy
+        # Initialize clients for each proxy
+        # We assume PROXIES_LIST has valid proxy URLs
         clients = []
-        for proxy_url in working_proxies:
+        for proxy_url in PROXIES_LIST:
             try:
                 # httpx.AsyncClient manages the connection pool for this proxy
                 client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
