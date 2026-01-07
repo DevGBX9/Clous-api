@@ -51,16 +51,26 @@ CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
 # Rotating Proxies (Format: http://user:pass@ip:port)
 PROXIES_LIST = [
-    "http://nfolpofx:x9k8uibuyggr@142.111.48.253:7030",
-    "http://nfolpofx:x9k8uibuyggr@23.95.150.145:6114",
-    "http://nfolpofx:x9k8uibuyggr@198.23.239.134:6540",
-    "http://nfolpofx:x9k8uibuyggr@107.172.163.27:6543",
-    "http://nfolpofx:x9k8uibuyggr@198.105.121.200:6462",
-    "http://nfolpofx:x9k8uibuyggr@64.137.96.74:6641",
-    "http://nfolpofx:x9k8uibuyggr@84.247.60.125:6095",
-    "http://nfolpofx:x9k8uibuyggr@216.10.27.159:6837",
-    "http://nfolpofx:x9k8uibuyggr@23.26.71.145:5628",
-    "http://nfolpofx:x9k8uibuyggr@23.27.208.120:5830",
+    "http://xuxnixpi:vo3vili2tpgd@142.111.48.253:7030",
+    "http://xuxnixpi:vo3vili2tpgd@23.95.150.145:6114",
+    "http://xuxnixpi:vo3vili2tpgd@198.23.239.134:6540",
+    "http://xuxnixpi:vo3vili2tpgd@107.172.163.27:6543",
+    "http://xuxnixpi:vo3vili2tpgd@198.105.121.200:6462",
+    "http://xuxnixpi:vo3vili2tpgd@64.137.96.74:6641",
+    "http://xuxnixpi:vo3vili2tpgd@84.247.60.125:6095",
+    "http://xuxnixpi:vo3vili2tpgd@216.10.27.159:6837",
+    "http://xuxnixpi:vo3vili2tpgd@23.26.71.145:5628",
+    "http://xuxnixpi:vo3vili2tpgd@23.27.208.120:5830",
+    "http://zqxnfczi:iits139wvq6q@142.111.48.253:7030",
+    "http://zqxnfczi:iits139wvq6q@23.95.150.145:6114",
+    "http://zqxnfczi:iits139wvq6q@198.23.239.134:6540",
+    "http://zqxnfczi:iits139wvq6q@107.172.163.27:6543",
+    "http://zqxnfczi:iits139wvq6q@198.105.121.200:6462",
+    "http://zqxnfczi:iits139wvq6q@64.137.96.74:6641",
+    "http://zqxnfczi:iits139wvq6q@84.247.60.125:6095",
+    "http://zqxnfczi:iits139wvq6q@216.10.27.159:6837",
+    "http://zqxnfczi:iits139wvq6q@23.26.71.145:5628",
+    "http://zqxnfczi:iits139wvq6q@23.27.208.120:5830",
 ]
 
 # Random iterator to pick proxies efficiently
