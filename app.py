@@ -148,6 +148,12 @@ PROXIES_LIST = [
 proxy_pool = itertools.cycle(PROXIES_LIST)
 
 # ==========================================
+#              FLASK SETUP
+# ==========================================
+app = Flask(__name__)
+CORS(app)  # Enable Cross-Origin Resource Sharing for decoupled frontend access
+
+# ==========================================
 #          DEVICE FINGERPRINTING
 # ==========================================
 
