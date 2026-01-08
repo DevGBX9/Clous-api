@@ -39,8 +39,6 @@ CONFIG = {
     "TIMEOUT_SECONDS": 30,
     "FIXED_EMAIL": "abdo1@gmail.com",
     "MAX_CONCURRENCY": 100,  # Increased for async
-    "FIREBASE_STABLE_PROXIES_URL": "https://clous-proxys-qpi-default-rtdb.firebaseio.com/stable_proxies.json",
-    "FIREBASE_MAIN_PROXIES_URL": "https://clous-proxys-qpi-default-rtdb.firebaseio.com/proxies.json",
 }
 
 # Values for username generation
@@ -51,38 +49,33 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-async def fetch_proxies():
-    """
-    Fetches the latest proxies from Firebase.
-    Prioritizes 'stable_proxies', falls back to 'proxies' if empty.
-    Returns a list of formatted proxy URLs.
-    """
-    # Order of priority: Stable first, then Main pool
-    endpoints = [
-        CONFIG["FIREBASE_STABLE_PROXIES_URL"],
-        CONFIG["FIREBASE_MAIN_PROXIES_URL"]
-    ]
-    
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for url in endpoints:
-            try:
-                response = await client.get(url)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data:
-                        proxies = []
-                        for item in data.values():
-                            addr = item.get('address')
-                            if addr:
-                                proxies.append(f"http://{addr}")
-                        if proxies:
-                            print(f"Successfully fetched {len(proxies)} proxies from {url.split('/')[-1]}")
-                            return proxies
-            except Exception as e:
-                print(f"Error fetching from {url}: {e}")
-                continue
-    return []
+# Rotating Proxies (Format: http://user:pass@ip:port)
+PROXIES_LIST = [
+    "http://xuxnixpi:vo3vili2tpgd@142.111.48.253:7030",
+    "http://xuxnixpi:vo3vili2tpgd@23.95.150.145:6114",
+    "http://xuxnixpi:vo3vili2tpgd@198.23.239.134:6540",
+    "http://xuxnixpi:vo3vili2tpgd@107.172.163.27:6543",
+    "http://xuxnixpi:vo3vili2tpgd@198.105.121.200:6462",
+    "http://xuxnixpi:vo3vili2tpgd@64.137.96.74:6641",
+    "http://xuxnixpi:vo3vili2tpgd@84.247.60.125:6095",
+    "http://xuxnixpi:vo3vili2tpgd@216.10.27.159:6837",
+    "http://xuxnixpi:vo3vili2tpgd@23.26.71.145:5628",
+    "http://xuxnixpi:vo3vili2tpgd@23.27.208.120:5830",
+    "http://zqxnfczi:iits139wvq6q@142.111.48.253:7030",
+    "http://zqxnfczi:iits139wvq6q@23.95.150.145:6114",
+    "http://zqxnfczi:iits139wvq6q@198.23.239.134:6540",
+    "http://zqxnfczi:iits139wvq6q@107.172.163.27:6543",
+    "http://zqxnfczi:iits139wvq6q@198.105.121.200:6462",
+    "http://zqxnfczi:iits139wvq6q@64.137.96.74:6641",
+    "http://zqxnfczi:iits139wvq6q@84.247.60.125:6095",
+    "http://zqxnfczi:iits139wvq6q@216.10.27.159:6837",
+    "http://zqxnfczi:iits139wvq6q@23.26.71.145:5628",
+    "http://zqxnfczi:iits139wvq6q@23.27.208.120:5830",
+]
 
+# Random iterator to pick proxies efficiently
+# We use random.choice mostly, but cycle can be used for round-robin
+proxy_pool = itertools.cycle(PROXIES_LIST)
 
 # Expanded User Agents
 USER_AGENTS = [
@@ -269,20 +262,10 @@ class SearchSession:
         """Starts the async task pool."""
         self.start_time = time.time()
         
-        # 1. Fetch Dynamic Proxies
-        proxies_list = await fetch_proxies()
-        
-        if not proxies_list:
-            return {
-                "status": "failed",
-                "username": None,
-                "reason": "no_proxies_available",
-                "duration": 0
-            }
-
-        # 2. Initialize clients for each proxy
+        # Initialize clients for each proxy
+        # We assume PROXIES_LIST has valid proxy URLs
         clients = []
-        for proxy_url in proxies_list:
+        for proxy_url in PROXIES_LIST:
             try:
                 # httpx.AsyncClient manages the connection pool for this proxy
                 client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
@@ -294,7 +277,7 @@ class SearchSession:
             return {
                 "status": "failed",
                 "username": None,
-                "reason": "no_proxies_reachable",
+                "reason": "no_proxies_available",
                 "duration": 0
             }
 
