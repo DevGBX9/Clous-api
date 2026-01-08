@@ -144,70 +144,55 @@ PROXIES_LIST = [
 ]
 
 # ==========================================
-#              MODERN FINGERPRINTING
+#              ADVANCED FINGERPRINTING
 # ==========================================
 
 class DeviceProfile:
     """
-    Creates a consistent device profile for a proxy to avoid detection.
+    Creates a highly detailed consistent device profile to mimic a real mobile user.
     """
     DEVICES = [
-        {"brand": "HONOR", "model": "ANY-LX2", "build": "HNANY-Q1", "dpi": "480", "res": "1080x2298", "version": "30/11"},
-        {"brand": "Samsung", "model": "SM-G930F", "build": "heroqltesq", "dpi": "420", "res": "1080x1920", "version": "28/9"},
-        {"brand": "OnePlus", "model": "ONEPLUS A6000", "build": "A6000", "dpi": "480", "res": "1080x1920", "version": "26/8"},
-        {"brand": "Samsung", "model": "SM-A525F", "build": "a52q", "dpi": "440", "res": "1080x2340", "version": "31/12"},
-        {"brand": "Xiaomi", "model": "M2101K6G", "build": "sweet", "dpi": "420", "res": "1080x2400", "version": "30/11"},
+        {"brand": "Samsung", "model": "SM-G998B", "build": "RP1A.200720.012", "dpi": "480", "res": "1440x3200", "ver": "30/11", "os": "11"},
+        {"brand": "Google", "model": "Pixel 6 Pro", "build": "SD1A.210817.036", "dpi": "560", "res": "1440x3120", "ver": "32/12", "os": "12"},
+        {"brand": "OnePlus", "model": "LE2123", "build": "RKQ1.201105.002", "dpi": "520", "res": "1440x3216", "ver": "31/11", "os": "11"},
+        {"brand": "Xiaomi", "model": "M2102K1G", "build": "SKQ1.211006.001", "dpi": "440", "res": "1080x2400", "ver": "33/13", "os": "13"},
+        {"brand": "Sony", "model": "XQ-BC52", "build": "61.1.A.9.128", "dpi": "640", "res": "1644x3840", "ver": "32/12", "os": "12"},
+        {"brand": "OPPO", "model": "CPH2173", "build": "RKQ1.201112.002", "dpi": "480", "res": "1440x3216", "ver": "31/11", "os": "11"},
     ]
 
     def __init__(self):
         dev = random.choice(self.DEVICES)
-        self.ua = f'Instagram 254.0.0.19.109 Android ({dev["version"]}; {dev["dpi"]}dpi; {dev["res"]}; {dev["brand"]}; {dev["model"]}; {dev["build"]}; qcom; en_US)'
-        self.device_id = f"android-{uuid4()}"
+        self.os_version = dev["os"]
+        self.app_version = "254.0.0.19.109"
+        # Standard IG User-Agent format
+        self.ua = f'Instagram {self.app_version} Android ({dev["ver"]}; {dev["dpi"]}dpi; {dev["res"]}; {dev["brand"]}; {dev["model"]}; {dev["build"]}; qcom; en_US; {self.app_version})'
+        
+        self.device_id = f"android-{uuid4().hex[:16]}"
         self.guid = str(uuid4())
+        self.phone_id = str(uuid4())
+        self.pigeon_id = str(uuid4())
+        self.session_id = str(uuid4())
         self.connection_type = random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G'])
+        self.locale = random.choice(['en_US', 'en_GB', 'ar_SA', 'en_AE'])
 
     def get_headers(self):
-        headers = HEADERS_TEMPLATE.copy()
-        headers['User-Agent'] = self.ua
-        headers['X-IG-Connection-Type'] = self.connection_type
-        headers['X-IG-Capabilities'] = 'AQ=='
-        headers['X-IG-Bandwidth-Speed-KBPS'] = str(random.randint(1000, 8000))
-        return headers
-
-class ProxyManager:
-    """
-    Manages a pool of proxies with cooldown (penalty) logic.
-    """
-    def __init__(self, proxy_list):
-        self.proxies = {}
-        for p in proxy_list:
-            self.proxies[p] = {
-                "client": httpx.AsyncClient(proxy=p, timeout=5.0),
-                "penalty_until": 0,
-                "profile": DeviceProfile()
-            }
-    
-    def get_available_client(self):
-        now = time.time()
-        available = [p for p, data in self.proxies.items() if data["penalty_until"] < now]
-        if not available:
-            return None
-        proxy = random.choice(available)
-        return proxy, self.proxies[proxy]
-
-    def apply_penalty(self, proxy, seconds=600):
-        """10-minute cooldown on 429 errors."""
-        self.proxies[proxy]["penalty_until"] = time.time() + seconds
-        print(f"[COOLDOWN] Proxy {proxy} penalized for {seconds}s")
-
-    async def close_all(self):
-        for data in self.proxies.values():
-            await data["client"].aclose()
-
-HEADERS_TEMPLATE = {
-    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'Accept-Language': 'en-US',
-}
+        return {
+            'User-Agent': self.ua,
+            'X-IG-Capabilities': 'AQ==',
+            'X-IG-App-ID': '124024574287414', # Fixed Instagram Android App ID
+            'X-IG-Connection-Type': self.connection_type,
+            'X-IG-Connection-Speed': f"{random.randint(1000, 5000)}kbps",
+            'X-IG-Bandwidth-Speed-KBPS': str(random.randint(2000, 9000)),
+            'X-IG-App-Locale': self.locale,
+            'X-IG-Device-Locale': self.locale,
+            'X-IG-Mapped-Locale': self.locale,
+            'X-Pigeon-Rawclient-Id': self.pigeon_id,
+            'X-Pigeon-Session-Id': self.session_id,
+            'Accept-Language': self.locale.replace('_', '-'),
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-FB-HTTP-Engine': 'Liger',
+            'Accept-Encoding': 'gzip, deflate',
+        }
 
 # ==========================================
 #              FLASK SETUP
@@ -272,22 +257,21 @@ class AutoUsernameGenerator:
 class AutoInstagramChecker:
     """
     Handles the HTTP communication with Instagram APIs.
-    Uses ProxyManager for cooldowns and persistent DeviceProfiles.
+    Now with enhanced device fingerprinting.
     """
-    def __init__(self, manager: ProxyManager):
-        self.manager = manager
+    def __init__(self, clients_map):
+        """
+        clients_map: {httpx.AsyncClient: DeviceProfile}
+        """
+        self.clients_map = clients_map
+        self.clients_list = list(clients_map.keys())
     
     async def check_username_availability(self, username):
         """
-        Checks availability using a non-penalized proxy.
+        Checks availability using a random proxy with a persistent profile.
         """
-        res = self.manager.get_available_client()
-        if not res:
-            return False, "", "no_proxies"
-        
-        proxy_url, data = res
-        client = data["client"]
-        profile = data["profile"]
+        client = random.choice(self.clients_list)
+        profile = self.clients_map[client]
 
         payload = {
             "email": CONFIG["FIXED_EMAIL"],
@@ -295,25 +279,23 @@ class AutoInstagramChecker:
             "password": f"Aa123456{username}",
             "device_id": profile.device_id,
             "guid": profile.guid,
+            "phone_id": profile.phone_id,
         }
         
         try:
             response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"], 
                 headers=profile.get_headers(), 
-                data=payload
+                data=payload,
+                timeout=5.0
             )
             response_text = response.text
             
-            if response.status_code == 429 or '"spam"' in response_text or 'rate_limit_error' in response_text:
-                self.manager.apply_penalty(proxy_url)
-                return False, response_text, "rate_limit"
-            
+            # Note: We removed the cooldown/penalty system as requested
             is_available = '"email_is_taken"' in response_text
             return is_available, response_text, None
             
         except Exception:
-            # Temporary error, don't necessarily penalize heavily but skip
             return False, "", "connection_error"
 
 
@@ -369,14 +351,23 @@ class SearchSession:
         """Starts the async task pool."""
         self.start_time = time.time()
         
-        # Initialize Proxy Manager
-        manager = ProxyManager(PROXIES_LIST)
-        checker = AutoInstagramChecker(manager)
+        # Initialize clients with persistent profiles
+        clients_map = {}
+        for proxy_url in PROXIES_LIST:
+            try:
+                client = httpx.AsyncClient(proxy=proxy_url, timeout=5.0)
+                clients_map[client] = DeviceProfile()
+            except Exception:
+                continue
+        
+        if not clients_map:
+            return {"status": "failed", "reason": "no_proxies"}
+
+        checker = AutoInstagramChecker(clients_map)
         
         # Launch workers
         tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
         
-        # Wait for completion or stop
         while not self.should_stop:
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
                 self.should_stop = True
@@ -387,12 +378,12 @@ class SearchSession:
                 
             await asyncio.sleep(0.1)
 
-        # Ensure all tasks stop
         self.should_stop = True
         await asyncio.gather(*tasks, return_exceptions=True)
         
         # Cleanup
-        await manager.close_all()
+        for client in clients_map.keys():
+            await client.aclose()
             
         return {
             "status": "success" if self.found_username else "failed",
