@@ -515,21 +515,17 @@ class AutoInstagramChecker:
     Enhanced Instagram checker with complete mobile API simulation.
     Maintains atomic device consistency per proxy session.
     """
-    def __init__(self, clients):
-        self.clients = clients
-        self.client_profiles = {}  # Map client to DeviceProfile
+    def __init__(self, client_proxy_pairs):
+        # Store (client, proxy_url) pairs
+        self.client_proxy_pairs = client_proxy_pairs
         
-        # Initialize device profile for each client
-        for client in clients:
-            # Extract proxy identifier for session consistency
-            proxy_key = str(client._proxy)
-            if proxy_key not in self.client_profiles:
-                self.client_profiles[proxy_key] = DeviceProfile()
-    
-    def _get_client_profile(self, client):
-        """Get or create device profile for client (O(1))"""
-        proxy_key = str(client._proxy)
-        return self.client_profiles[proxy_key]
+        # Map proxy URLs to device profiles
+        self.proxy_profiles = {}
+        
+        # Initialize device profile for each unique proxy
+        for _, proxy_url in self.client_proxy_pairs:
+            if proxy_url not in self.proxy_profiles:
+                self.proxy_profiles[proxy_url] = DeviceProfile()
     
     def _get_instagram_payload(self, username, device_profile):
         """Build Instagram API payload with device-specific parameters"""
@@ -559,9 +555,9 @@ class AutoInstagramChecker:
         Check username availability with full device simulation.
         Returns: (is_available, response_text, error_type)
         """
-        # Pick random client with session persistence
-        client = random.choice(self.clients)
-        device_profile = self._get_client_profile(client)
+        # Pick random client and its associated proxy URL
+        client, proxy_url = random.choice(self.client_proxy_pairs)
+        device_profile = self.proxy_profiles[proxy_url]
         
         try:
             # Generate payload and headers
@@ -684,8 +680,8 @@ class SearchSession:
         """Starts the async task pool."""
         self.start_time = time.time()
         
-        # Initialize clients for each proxy
-        clients = []
+        # Initialize clients with their proxy URLs
+        client_proxy_pairs = []
         for proxy_url in PROXIES_LIST:
             try:
                 # httpx.AsyncClient manages the connection pool for this proxy
@@ -694,11 +690,11 @@ class SearchSession:
                     timeout=httpx.Timeout(3.0, connect=1.0),
                     limits=httpx.Limits(max_keepalive_connections=10, max_connections=100)
                 )
-                clients.append(client)
+                client_proxy_pairs.append((client, proxy_url))
             except Exception:
                 continue
         
-        if not clients:
+        if not client_proxy_pairs:
             return {
                 "status": "failed",
                 "username": None,
@@ -706,7 +702,7 @@ class SearchSession:
                 "duration": 0
             }
 
-        checker = AutoInstagramChecker(clients)
+        checker = AutoInstagramChecker(client_proxy_pairs)
         
         # Launch workers
         tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
@@ -728,8 +724,8 @@ class SearchSession:
         await asyncio.gather(*tasks, return_exceptions=True)
         
         # Cleanup clients
-        for c in clients:
-            await c.aclose()
+        for client, _ in client_proxy_pairs:
+            await client.aclose()
             
         return {
             "status": "success" if self.found_username else "failed",
@@ -772,4 +768,6 @@ async def search():
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    # Use waitress for production
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=port)
