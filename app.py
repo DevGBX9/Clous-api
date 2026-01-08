@@ -143,27 +143,70 @@ PROXIES_LIST = [
     "http://idzfeaih:tg11yrege1lz@23.27.208.120:5830",
 ]
 
-# Random iterator to pick proxies efficiently
-# We use random.choice mostly, but cycle can be used for round-robin
-proxy_pool = itertools.cycle(PROXIES_LIST)
+# ==========================================
+#              MODERN FINGERPRINTING
+# ==========================================
 
-# Expanded User Agents
-USER_AGENTS = [
-    'Instagram 6.12.1 Android (30/11; 480dpi; 1080x2298; HONOR; ANY-LX2; HNANY-Q1; qcom; en_IQ)',
-    'Instagram 10.20.0 Android (28/9; 420dpi; 1080x1920; Samsung; SM-G930F; heroqltesq; qcom; en_US)',
-    'Instagram 9.7.0 Android (26/8; 480dpi; 1080x1920; OnePlus; ONEPLUS A6000; A6000; qcom; en_GB)',
-    'Instagram 254.0.0.19.109 Android (31/12; 440dpi; 1080x2340; Samsung; SM-A525F; a52q; qcom; en_US)',
-    'Instagram 223.0.0.12.102 Android (30/11; 420dpi; 1080x2400; Xiaomi; M2101K6G; sweet; qcom; en_US)',
-    'Instagram 219.0.0.12.117 Android (29/10; 450dpi; 1080x2400; OPPO; CPH2083; OP4C2F; mt6765; en_IN)',
-    'Instagram 250.0.0.21.109 Android (33/13; 560dpi; 1440x3200; Google; Pixel 6 Pro; raven; google; en_US)',
-    'Instagram 198.0.0.32.120 Android (27/8.1.0; 320dpi; 720x1280; HUAWEI; DUB-LX1; HWY9; hisilicon; en_US)',
-]
+class DeviceProfile:
+    """
+    Creates a consistent device profile for a proxy to avoid detection.
+    """
+    DEVICES = [
+        {"brand": "HONOR", "model": "ANY-LX2", "build": "HNANY-Q1", "dpi": "480", "res": "1080x2298", "version": "30/11"},
+        {"brand": "Samsung", "model": "SM-G930F", "build": "heroqltesq", "dpi": "420", "res": "1080x1920", "version": "28/9"},
+        {"brand": "OnePlus", "model": "ONEPLUS A6000", "build": "A6000", "dpi": "480", "res": "1080x1920", "version": "26/8"},
+        {"brand": "Samsung", "model": "SM-A525F", "build": "a52q", "dpi": "440", "res": "1080x2340", "version": "31/12"},
+        {"brand": "Xiaomi", "model": "M2101K6G", "build": "sweet", "dpi": "420", "res": "1080x2400", "version": "30/11"},
+    ]
+
+    def __init__(self):
+        dev = random.choice(self.DEVICES)
+        self.ua = f'Instagram 254.0.0.19.109 Android ({dev["version"]}; {dev["dpi"]}dpi; {dev["res"]}; {dev["brand"]}; {dev["model"]}; {dev["build"]}; qcom; en_US)'
+        self.device_id = f"android-{uuid4()}"
+        self.guid = str(uuid4())
+        self.connection_type = random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G'])
+
+    def get_headers(self):
+        headers = HEADERS_TEMPLATE.copy()
+        headers['User-Agent'] = self.ua
+        headers['X-IG-Connection-Type'] = self.connection_type
+        headers['X-IG-Capabilities'] = 'AQ=='
+        headers['X-IG-Bandwidth-Speed-KBPS'] = str(random.randint(1000, 8000))
+        return headers
+
+class ProxyManager:
+    """
+    Manages a pool of proxies with cooldown (penalty) logic.
+    """
+    def __init__(self, proxy_list):
+        self.proxies = {}
+        for p in proxy_list:
+            self.proxies[p] = {
+                "client": httpx.AsyncClient(proxy=p, timeout=5.0),
+                "penalty_until": 0,
+                "profile": DeviceProfile()
+            }
+    
+    def get_available_client(self):
+        now = time.time()
+        available = [p for p, data in self.proxies.items() if data["penalty_until"] < now]
+        if not available:
+            return None
+        proxy = random.choice(available)
+        return proxy, self.proxies[proxy]
+
+    def apply_penalty(self, proxy, seconds=600):
+        """10-minute cooldown on 429 errors."""
+        self.proxies[proxy]["penalty_until"] = time.time() + seconds
+        print(f"[COOLDOWN] Proxy {proxy} penalized for {seconds}s")
+
+    async def close_all(self):
+        for data in self.proxies.values():
+            await data["client"].aclose()
 
 HEADERS_TEMPLATE = {
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
     'Accept-Language': 'en-US',
-    'X-IG-Capabilities': 'AQ==',
-    'Accept-Encoding': 'gzip',
 }
 
 # ==========================================
@@ -229,54 +272,48 @@ class AutoUsernameGenerator:
 class AutoInstagramChecker:
     """
     Handles the HTTP communication with Instagram APIs.
-    Uses Rotating Proxies and Random User Agents.
+    Uses ProxyManager for cooldowns and persistent DeviceProfiles.
     """
-    def __init__(self, clients):
-        self.clients = clients
+    def __init__(self, manager: ProxyManager):
+        self.manager = manager
     
-    def _get_random_headers(self):
-        """Generates headers with randomized device bandwidth/connection type."""
-        headers = HEADERS_TEMPLATE.copy()
-        headers['User-Agent'] = f'Instagram {random.choice(USER_AGENTS)}'
-        headers['X-IG-Connection-Type'] = random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G'])
-        headers['X-IG-Bandwidth-Speed-KBPS'] = str(random.randint(1000, 8000))
-        headers['X-IG-Bandwidth-TotalBytes-B'] = str(random.randint(500000, 5000000))
-        headers['X-IG-Bandwidth-TotalTime-MS'] = str(random.randint(50, 500))
-        return headers
-
     async def check_username_availability(self, username):
         """
-        Checks availability of a username using a random proxy client.
+        Checks availability using a non-penalized proxy.
         """
-        # Pick a random client from the pool
-        client = random.choice(self.clients)
+        res = self.manager.get_available_client()
+        if not res:
+            return False, "", "no_proxies"
+        
+        proxy_url, data = res
+        client = data["client"]
+        profile = data["profile"]
 
-        # Generate Fresh Device IDs for total anonymity
-        data = {
+        payload = {
             "email": CONFIG["FIXED_EMAIL"],
             "username": username,
             "password": f"Aa123456{username}",
-            "device_id": f"android-{uuid4()}",
-            "guid": str(uuid4()),
+            "device_id": profile.device_id,
+            "guid": profile.guid,
         }
         
         try:
-            # Short timeout (3s)
             response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"], 
-                headers=self._get_random_headers(), 
-                data=data
+                headers=profile.get_headers(), 
+                data=payload
             )
             response_text = response.text
             
-            if '"spam"' in response_text or 'rate_limit_error' in response_text:
+            if response.status_code == 429 or '"spam"' in response_text or 'rate_limit_error' in response_text:
+                self.manager.apply_penalty(proxy_url)
                 return False, response_text, "rate_limit"
             
             is_available = '"email_is_taken"' in response_text
             return is_available, response_text, None
             
-        except (httpx.RequestError, httpx.TimeoutException):
-            # Proxy error or timeout is common, treat as not found/skip to keep moving
+        except Exception:
+            # Temporary error, don't necessarily penalize heavily but skip
             return False, "", "connection_error"
 
 
@@ -332,26 +369,9 @@ class SearchSession:
         """Starts the async task pool."""
         self.start_time = time.time()
         
-        # Initialize clients for each proxy
-        # We assume PROXIES_LIST has valid proxy URLs
-        clients = []
-        for proxy_url in PROXIES_LIST:
-            try:
-                # httpx.AsyncClient manages the connection pool for this proxy
-                client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
-                clients.append(client)
-            except Exception:
-                continue
-        
-        if not clients:
-            return {
-                "status": "failed",
-                "username": None,
-                "reason": "no_proxies_available",
-                "duration": 0
-            }
-
-        checker = AutoInstagramChecker(clients)
+        # Initialize Proxy Manager
+        manager = ProxyManager(PROXIES_LIST)
+        checker = AutoInstagramChecker(manager)
         
         # Launch workers
         tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
@@ -362,8 +382,6 @@ class SearchSession:
                 self.should_stop = True
                 break
             
-            # Check if all tasks finished (e.g. if we had limited attempts, but here we loop forever)
-            # Actually, we should check if we found something
             if self.found_username:
                 break
                 
@@ -373,9 +391,8 @@ class SearchSession:
         self.should_stop = True
         await asyncio.gather(*tasks, return_exceptions=True)
         
-        # Cleanup clients
-        for c in clients:
-            await c.aclose()
+        # Cleanup
+        await manager.close_all()
             
         return {
             "status": "success" if self.found_username else "failed",
