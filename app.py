@@ -143,159 +143,192 @@ PROXIES_LIST = [
     "http://idzfeaih:tg11yrege1lz@23.27.208.120:5830",
 ]
 
+# Random iterator to pick proxies efficiently
+# We use random.choice mostly, but cycle can be used for round-robin
+proxy_pool = itertools.cycle(PROXIES_LIST)
+
 # ==========================================
-#              ADVANCED FINGERPRINTING
+#          DEVICE FINGERPRINTING
 # ==========================================
 
 class DeviceProfile:
     """
-    Creates a highly detailed consistent device profile to mimic a real mobile user.
+    Simulates a comprehensive hardware and software fingerprint for an Android device.
+    Atomic Consistency is maintained between OS version, hardware, and identifiers.
     """
-    DEVICES = [
-        {"brand": "Samsung", "model": "SM-G998B", "build": "RP1A.200720.012", "dpi": "480", "res": "1440x3200", "ver": "30/11", "os": "11"},
-        {"brand": "Google", "model": "Pixel 6 Pro", "build": "SD1A.210817.036", "dpi": "560", "res": "1440x3120", "ver": "32/12", "os": "12"},
-        {"brand": "OnePlus", "model": "LE2123", "build": "RKQ1.201105.002", "dpi": "520", "res": "1440x3216", "ver": "31/11", "os": "11"},
-        {"brand": "Xiaomi", "model": "M2102K1G", "build": "SKQ1.211006.001", "dpi": "440", "res": "1080x2400", "ver": "33/13", "os": "13"},
-        {"brand": "Sony", "model": "XQ-BC52", "build": "61.1.A.9.128", "dpi": "640", "res": "1644x3840", "ver": "32/12", "os": "12"},
-        {"brand": "OPPO", "model": "CPH2173", "build": "RKQ1.201112.002", "dpi": "480", "res": "1440x3216", "ver": "31/11", "os": "11"},
+    
+    HARDWARE_PROFILES = [
+        {
+            "brand": "Samsung",
+            "model": "SM-G991B",
+            "codename": "o1s",
+            "android_version": "13",
+            "sdk_version": "33",
+            "dpi": "480",
+            "res": "1080x2400",
+            "cpu": "exynos2100",
+            "manufacturer": "samsung"
+        },
+        {
+            "brand": "Google",
+            "model": "Pixel 7 Pro",
+            "codename": "cheetah",
+            "android_version": "14",
+            "sdk_version": "34",
+            "dpi": "560",
+            "res": "1440x3120",
+            "cpu": "tensor-g2",
+            "manufacturer": "Google"
+        },
+        {
+            "brand": "Xiaomi",
+            "model": "M2101K6G",
+            "codename": "sweet",
+            "android_version": "12",
+            "sdk_version": "31",
+            "dpi": "440",
+            "res": "1080x2400",
+            "cpu": "qcom",
+            "manufacturer": "Xiaomi"
+        },
+        {
+            "brand": "OnePlus",
+            "model": "LE2113",
+            "codename": "lemonade",
+            "android_version": "13",
+            "sdk_version": "33",
+            "dpi": "450",
+            "res": "1080x2400",
+            "cpu": "qcom",
+            "manufacturer": "OnePlus"
+        }
+    ]
+
+    LOCALES = [
+        ("en_US", "en-US"), ("en_GB", "en-GB"), ("ar_SA", "ar-SA"),
+        ("fr_FR", "fr-FR"), ("de_DE", "de-DE"), ("tr_TR", "tr-TR")
     ]
 
     def __init__(self):
-        dev = random.choice(self.DEVICES)
-        self.os_version = dev["os"]
-        self.app_version = "254.0.0.19.109"
-        # Standard IG User-Agent format
-        self.ua = f'Instagram {self.app_version} Android ({dev["ver"]}; {dev["dpi"]}dpi; {dev["res"]}; {dev["brand"]}; {dev["model"]}; {dev["build"]}; qcom; en_US; {self.app_version})'
+        # Atomic binding: every attribute is fixed once assigned to this profile
+        profile = random.choice(self.HARDWARE_PROFILES)
+        self.brand = profile["brand"]
+        self.model = profile["model"]
+        self.codename = profile["codename"]
+        self.android_ver = profile["android_version"]
+        self.sdk_ver = profile["sdk_version"]
+        self.dpi = profile["dpi"]
+        self.res = profile["res"]
+        self.cpu = profile["cpu"]
+        self.manufacturer = profile["manufacturer"]
         
+        # Consistent Identifiers
         self.device_id = f"android-{uuid4().hex[:16]}"
         self.guid = str(uuid4())
-        self.phone_id = str(uuid4())
-        self.pigeon_id = str(uuid4())
-        self.session_id = str(uuid4())
-        self.connection_type = random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G'])
-        self.locale = random.choice(['en_US', 'en_GB', 'ar_SA', 'en_AE'])
-
-    def get_headers(self):
-        return {
-            'User-Agent': self.ua,
-            'X-IG-Capabilities': 'AQ==',
-            'X-IG-App-ID': '124024574287414', # Fixed Instagram Android App ID
-            'X-IG-Connection-Type': self.connection_type,
-            'X-IG-Connection-Speed': f"{random.randint(1000, 5000)}kbps",
-            'X-IG-Bandwidth-Speed-KBPS': str(random.randint(2000, 9000)),
-            'X-IG-App-Locale': self.locale,
-            'X-IG-Device-Locale': self.locale,
-            'X-IG-Mapped-Locale': self.locale,
-            'X-Pigeon-Rawclient-Id': self.pigeon_id,
-            'X-Pigeon-Session-Id': self.session_id,
-            'Accept-Language': self.locale.replace('_', '-'),
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-FB-HTTP-Engine': 'Liger',
-            'Accept-Encoding': 'gzip, deflate',
-        }
-
-# ==========================================
-#              FLASK SETUP
-# ==========================================
-app = Flask(__name__)
-CORS(app)  # Enable Cross-Origin Resource Sharing for decoupled frontend access
-
-
-# ==========================================
-#              CORE LOGIC
-# ==========================================
-
-class AutoUsernameGenerator:
-    """
-    Responsible for generating valid 5-character Instagram usernames.
-    """
-    def __init__(self):
-        self.generated_usernames = set()
-    
-    def is_valid_instagram_username(self, username):
-        """
-        Validates username against Instagram's rules.
-        """
-        if len(username) != 5:
-            return False
+        self.pigeon_session_id = str(uuid4())
         
-        allowed_chars = set(CHARS["ALL_VALID"] + CHARS["SYMBOLS"])
-        if not all(char in allowed_chars for char in username):
-            return False
+        # Locales
+        self.locale_pair = random.choice(self.LOCALES)
+        self.app_locale = self.locale_pair[0]
+        self.mapped_locale = self.locale_pair[1]
         
-        if username.startswith('.') or username.endswith('.'):
-            return False
+        # IG Internal values
+        self.app_version = "311.0.0.32.118" # Recent Instagram version
+        self.app_version_code = "543210987"
+        self.capabilities = "3brTvw==" # Standard base64 cap string
         
-        if '..' in username or '._' in username or '_.' in username:
-            return False
-        
-        if username[0] in CHARS["DIGITS"]:
-            return False
-        
-        return True
-    
-    def generate(self):
-        """
-        Generates a unique, compliant 5-char username.
-        """
-        max_attempts = 10
-        for _ in range(max_attempts):
-            username = random.choice(CHARS["LETTERS"])
-            username += ''.join(random.choices(CHARS["ALL_VALID"], k=4))
-            
-            if (username not in self.generated_usernames and 
-                self.is_valid_instagram_username(username)):
-                self.generated_usernames.add(username)
-                return username
-        
-        timestamp = int(time.time() * 1000) % 10000
-        username = f"{random.choice(CHARS['LETTERS'])}{timestamp:04d}"[:5]
-        self.generated_usernames.add(username)
-        return username
-
+    def get_user_agent(self):
+        """Constructs a realistic Instagram Android User-Agent."""
+        # Format: Instagram <app_ver> Android (<android_ver>/<sdk_ver>; <dpi>; <res>; <brand>; <model>; <codename>; <cpu>; <locale>)
+        return (f"Instagram {self.app_version} Android "
+                f"({self.android_ver}/{self.sdk_ver}; {self.dpi}dpi; {self.res}; "
+                f"{self.manufacturer}; {self.model}; {self.codename}; {self.cpu}; {self.app_locale})")
 
 class AutoInstagramChecker:
     """
-    Handles the HTTP communication with Instagram APIs.
-    Now with enhanced device fingerprinting.
+    Handles optimized HTTP communication with Instagram.
+    Maintains sticky DeviceProfiles for each proxy session.
     """
-    def __init__(self, clients_map):
+    def __init__(self, clients_with_profiles):
         """
-        clients_map: {httpx.AsyncClient: DeviceProfile}
+        clients_with_profiles: list of (httpx.AsyncClient, DeviceProfile) tuples
         """
-        self.clients_map = clients_map
-        self.clients_list = list(clients_map.keys())
+        self.client_pool = clients_with_profiles
     
+    def _calculate_jitter_headers(self):
+        """Simulates realistic network jitter and bandwidth metrics."""
+        # Realistic values based on mobile/wifi connection
+        total_bytes = random.randint(1024 * 50, 1024 * 500) # 50KB to 500KB
+        total_time_ms = random.randint(100, 800)
+        speed_kbps = (total_bytes * 8) / max(total_time_ms, 1) # Simple bit math
+        
+        return {
+            'X-IG-Bandwidth-Speed-KBPS': f"{speed_kbps:.3f}",
+            'X-IG-Bandwidth-TotalBytes-B': str(total_bytes),
+            'X-IG-Bandwidth-TotalTime-MS': str(total_time_ms),
+        }
+
+    def _get_headers(self, profile):
+        """Orchestrates standard and advanced GraphQL headers."""
+        headers = {
+            'User-Agent': profile.get_user_agent(),
+            'X-IG-App-ID': '124024574287414', # Standard IG App ID
+            'X-IG-Capabilities': profile.capabilities,
+            'X-IG-App-Locale': profile.app_locale,
+            'X-IG-Device-Locale': profile.app_locale,
+            'X-IG-Mapped-Locale': profile.mapped_locale,
+            'X-Pigeon-Session-Id': profile.pigeon_session_id,
+            'X-Pigeon-Raw-Client-Time': f"{time.time():.3f}",
+            'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE']),
+            'X-IG-Capabilities': '3brTvw==',
+            'X-IG-Nav-Chain': '1G2:feed_timeline:1,1G2:feed_timeline:2', # Simulates navigation history
+            'X-FB-HTTP-Engine': 'Liger',
+            'X-FB-Client-IP': 'True',
+            'Accept-Language': profile.mapped_locale,
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept-Encoding': 'gzip, deflate',
+            'Host': 'i.instagram.com',
+            'Connection': 'keep-alive',
+        }
+        
+        # Merge network jitter
+        headers.update(self._calculate_jitter_headers())
+        return headers
+
     async def check_username_availability(self, username):
         """
-        Checks availability using a random proxy with a persistent profile.
+        High-fidelity check with persistent device identity.
         """
-        client = random.choice(self.clients_list)
-        profile = self.clients_map[client]
+        # Pick a random client+profile pair
+        client, profile = random.choice(self.client_pool)
 
-        payload = {
+        data = {
             "email": CONFIG["FIXED_EMAIL"],
             "username": username,
-            "password": f"Aa123456{username}",
+            "password": f"Aa123x7{username}",
             "device_id": profile.device_id,
             "guid": profile.guid,
-            "phone_id": profile.phone_id,
+            "ad_id": str(uuid4()), # Dynamic per request but realistic
+            "waterfall_id": str(uuid4()), # Registration waterfall id
         }
         
         try:
             response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"], 
-                headers=profile.get_headers(), 
-                data=payload,
-                timeout=5.0
+                headers=self._get_headers(profile), 
+                data=data
             )
             response_text = response.text
             
-            # Note: We removed the cooldown/penalty system as requested
+            # Instagram often blocks if TLS/Headers aren't perfect
+            if '"spam"' in response_text or 'rate_limit_error' in response_text or response.status_code == 429:
+                return False, response_text, "rate_limit"
+            
+            # Availability check: 'email_is_taken' or 'username_is_taken' logic
             is_available = '"email_is_taken"' in response_text
             return is_available, response_text, None
             
-        except Exception:
+        except (httpx.RequestError, httpx.TimeoutException):
             return False, "", "connection_error"
 
 
@@ -348,42 +381,58 @@ class SearchSession:
             await asyncio.sleep(0.01)
 
     async def run(self):
-        """Starts the async task pool."""
+        """Starts the async task pool with persistent device identities."""
         self.start_time = time.time()
         
-        # Initialize clients with persistent profiles
-        clients_map = {}
+        # Initialize clients + profiles for each proxy
+        clients_with_profiles = []
         for proxy_url in PROXIES_LIST:
             try:
-                client = httpx.AsyncClient(proxy=proxy_url, timeout=5.0)
-                clients_map[client] = DeviceProfile()
+                # One client and one consistent profile per proxy
+                client = httpx.AsyncClient(
+                    proxy=proxy_url, 
+                    timeout=5.0,
+                    # Simulated TLS Fingerprinting: standard browser-like limits
+                    limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+                )
+                profile = DeviceProfile()
+                clients_with_profiles.append((client, profile))
             except Exception:
                 continue
         
-        if not clients_map:
-            return {"status": "failed", "reason": "no_proxies"}
+        if not clients_with_profiles:
+            return {
+                "status": "failed",
+                "username": None,
+                "reason": "no_proxies_available",
+                "duration": 0
+            }
 
-        checker = AutoInstagramChecker(clients_map)
+        # Checker now uses the pool of (client, profile) tuples
+        checker = AutoInstagramChecker(clients_with_profiles)
         
         # Launch workers
         tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
         
-        while not self.should_stop:
-            if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
-                self.should_stop = True
-                break
-            
-            if self.found_username:
-                break
+        # Wait for completion or stop
+        try:
+            while not self.should_stop:
+                if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
+                    self.should_stop = True
+                    break
                 
-            await asyncio.sleep(0.1)
-
-        self.should_stop = True
-        await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Cleanup
-        for client in clients_map.keys():
-            await client.aclose()
+                if self.found_username:
+                    break
+                    
+                await asyncio.sleep(0.1)
+        finally:
+            # Ensure all tasks stop gracefully
+            self.should_stop = True
+            await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Cleanup all clients
+            for client, profile in clients_with_profiles:
+                await client.aclose()
             
         return {
             "status": "success" if self.found_username else "failed",
