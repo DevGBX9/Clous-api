@@ -204,13 +204,11 @@ CORS(app)
 def create_secure_client(proxy_url: str) -> httpx.AsyncClient:
     """
     Create a secure HTTP client.
-    Uses standard httpx client which proved more stable with these proxies.
-    trust_env=False ensures no local IP leak.
+    Reverted to simple configuration for maximum stability.
     """
     return httpx.AsyncClient(
-        proxy=proxy_url,
-        timeout=httpx.Timeout(10.0, connect=5.0),
-        trust_env=False, # Ignore system proxies/env vars
+        proxy=proxy_url, 
+        timeout=10.0,
         follow_redirects=True
     )
 
