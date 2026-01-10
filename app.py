@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Instagram Username Checker - On-Demand API
-==========================================
-
-This script runs a Flask API that checks for available 5-character Instagram usernames.
-It is designed to be deployed on serverless/container environments like Render.
+Instagram Username Checker - Self-Contained API
+===============================================
 
 Features:
 - On-Demand Search: Triggered via /search endpoint.
-- High Concurrency: Uses ThreadPoolExecutor for rapid checking.
-- Smart Stopping: Stops immediately upon finding a user, hitting a rate limit, or timing out.
-- Decoupled Frontend: Serves a JSON API; frontend logic is in index.html.
+- Self-Contained: Generates valid legacy User-Agents internally (no external file needed).
+- Security: Rotates 1000 unique User-Agents PER SEARCH request.
+- Stats: Returns detailed info on which UA found the username.
 - Anonymity: Rotating Proxies, Random User-Agents, Dynamic Device IDs.
-- Semi-Quad Only: Generates usernames with at least one underscore or dot.
 
-Author: @GBX_9 (Original Helper)
+Author: @GBX_9
 """
 
 import os
@@ -35,19 +31,11 @@ sys.dont_write_bytecode = True
 # ==========================================
 #              CONFIGURATION
 # ==========================================
-import threading
-from generate_ua import generate_agents
-
-# ... (Previous imports remain, ensuring we have what we need)
-
-# ==========================================
-#              CONFIGURATION
-# ==========================================
 CONFIG = {
     "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
     "TIMEOUT_SECONDS": 30,
     "FIXED_EMAIL": "abdo1@gmail.com",
-    "MAX_CONCURRENCY": 50,  # Increased for async
+    "MAX_CONCURRENCY": 50,
 }
 
 # Values for username generation
@@ -58,7 +46,7 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-# Rotating Proxies (Format: http://user:pass@ip:port)
+# Rotating Proxies
 PROXIES_LIST = [
     "http://mpdmbsys:r36zb0uyv1ls@142.111.48.253:7030",
     "http://mpdmbsys:r36zb0uyv1ls@23.95.150.145:6114",
@@ -152,52 +140,75 @@ PROXIES_LIST = [
     "http://idzfeaih:tg11yrege1lz@23.27.208.120:5830",
 ]
 
-# Random iterator to pick proxies efficiently
-# We use random.choice mostly, but cycle can be used for round-robin
+# Random iterator
 proxy_pool = itertools.cycle(PROXIES_LIST)
 
-# ----------------------------------------------------
-# DYNAMIC USER-AGENT GENERATION (MEMORY-ONLY)
-# ----------------------------------------------------
-# Initialize with 1000 generated agents
-print("Initializing 1000 Legacy User-Agents...")
-USER_AGENTS = generate_agents(1000)
+# ==========================================
+#      LEGACY UA GENERATOR (INTERNAL)
+# ==========================================
+# Components for generating valid legacy User-Agents (Safe from signing)
+UA_INSTAGRAM_VERSIONS = [
+    f"{major}.{minor}.{patch}" 
+    for major in range(10, 120, 2)
+    for minor in range(0, 5) 
+    for patch in range(0, 5)
+]
 
-def auto_refresh_user_agents():
-    """
-    Background task to refresh User-Agents every 60 seconds.
-    Runs silently in a daemon thread.
-    """
-    global USER_AGENTS
-    while True:
-        try:
-            time.sleep(60) # Wait 1 minute
-            # Generate new batch
-            new_agents = generate_agents(1000)
-            if new_agents:
-                USER_AGENTS = new_agents
-                # Optional: print debug info to logs (visible in Railway logs)
-                # print(f"[Auto-Refresh] Updated {len(USER_AGENTS)} User-Agents.")
-        except Exception as e:
-            print(f"[Auto-Refresh Error] {e}")
-            time.sleep(60) # Retry after minute
+UA_ANDROID_VERSIONS = [
+    ("19", "4.4.2"), ("21", "5.0"), ("22", "5.1"), ("23", "6.0"), 
+    ("24", "7.0"), ("25", "7.1.1"), ("26", "8.0.0"), ("27", "8.1.0"), 
+    ("28", "9"), ("29", "10")
+]
 
-# Start the background thread immediately
-threading.Thread(target=auto_refresh_user_agents, daemon=True).start()
+UA_DEVICES = [
+    {"brand": "Samsung", "model": "SM-G930F", "device": "herolte", "cpu": "samsung"},
+    {"brand": "Samsung", "model": "SM-G950F", "device": "dreamlte", "cpu": "samsung"},
+    {"brand": "Samsung", "model": "SM-G960F", "device": "starlte", "cpu": "samsung"},
+    {"brand": "Samsung", "model": "SM-J530F", "device": "j5y17lte", "cpu": "exynos7870"},
+    {"brand": "Samsung", "model": "SM-A520F", "device": "a5y17lte", "cpu": "samsung"},
+    {"brand": "Xiaomi", "model": "Redmi Note 7", "device": "lavender", "cpu": "qcom"},
+    {"brand": "Xiaomi", "model": "Redmi Note 5", "device": "whyred", "cpu": "qcom"},
+    {"brand": "Xiaomi", "model": "MI 8", "device": "dipper", "cpu": "qcom"},
+    {"brand": "Huawei", "model": "ANE-LX1", "device": "HWANE", "cpu": "hisilicon"},
+    # We can add more here if needed, but this combination creates thousands of variants
+]
 
+UA_RESOLUTIONS = ["1080x1920", "1080x2240", "1080x2340", "720x1280", "1440x2560"]
+UA_DPIS = ["320", "420", "440", "480", "560", "640"]
+UA_LOCALES = ["en_US", "en_GB", "es_ES", "fr_FR", "de_DE", "it_IT"]
 
-HEADERS_TEMPLATE = {
-    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'Accept-Language': 'en-US',
-    'X-IG-Capabilities': 'AQ==',
-    'Accept-Encoding': 'gzip',
-}
+def generate_legacy_agents(count=1000):
+    """Generates a list of valid legacy User-Agents on the fly."""
+    agents = []
+    seen = set()
+    attempts = 0
+    # Add safety to avoid infinite loops if pool is exhausted
+    while len(agents) < count and attempts < count * 5:
+        attempts += 1
+        app_ver = random.choice(UA_INSTAGRAM_VERSIONS)
+        sdk, android_ver = random.choice(UA_ANDROID_VERSIONS)
+        device = random.choice(UA_DEVICES)
+        res = random.choice(UA_RESOLUTIONS)
+        dpi = random.choice(UA_DPIS)
+        locale = random.choice(UA_LOCALES) if random.random() < 0.2 else "en_US"
+        
+        ua_string = (
+            f"Instagram {app_ver} Android "
+            f"({sdk}/{android_ver}; {dpi}dpi; {res}; {device['brand']}; "
+            f"{device['model']}; {device['device']}; {device['cpu']}; {locale})"
+        )
+        
+        if ua_string not in seen:
+            seen.add(ua_string)
+            agents.append(ua_string)
+            
+    return agents
 
 # ==========================================
 #              FLASK SETUP
 # ==========================================
 app = Flask(__name__)
-CORS(app)  # Enable Cross-Origin Resource Sharing for decoupled frontend access
+CORS(app)
 
 
 # ==========================================
@@ -205,62 +216,31 @@ CORS(app)  # Enable Cross-Origin Resource Sharing for decoupled frontend access
 # ==========================================
 
 class AutoUsernameGenerator:
-    """
-    Responsible for generating valid 5-character Instagram usernames.
-    Now generates ONLY semi-quad usernames (with at least one underscore or dot).
-    """
+    """Generates valid 5-character semi-quad usernames."""
     def __init__(self):
         self.generated_usernames = set()
     
     def is_valid_instagram_username(self, username):
-        """
-        Validates username against Instagram's rules.
-        """
-        if len(username) != 5:
-            return False
-        
+        if len(username) != 5: return False
         allowed_chars = set(CHARS["ALL_VALID"] + CHARS["SYMBOLS"])
-        if not all(char in allowed_chars for char in username):
-            return False
-        
-        if username.startswith('.') or username.endswith('.'):
-            return False
-        
-        if '..' in username or '._' in username or '_.' in username:
-            return False
-        
-        if username[0] in CHARS["DIGITS"]:
-            return False
-        
+        if not all(char in allowed_chars for char in username): return False
+        if username.startswith('.') or username.endswith('.'): return False
+        if '..' in username or '._' in username or '_.' in username: return False
+        if username[0] in CHARS["DIGITS"]: return False
         return True
     
     def is_semi_quad(self, username):
-        """
-        Checks if the username is a 'semi-quad' (contains at least one underscore or dot).
-        """
         return '_' in username or '.' in username
     
     def generate(self):
-        """
-        Generates a unique, compliant 5-char semi-quad username.
-        Semi-quad means it must contain at least one underscore or dot.
-        """
         max_attempts = 100
-        
         for _ in range(max_attempts):
-            # Start with a letter (Instagram requirement)
             first_char = random.choice(CHARS["LETTERS"])
-            
-            # Choose a random position (1-3) to insert a symbol (. or _)
             symbol_positions = [1, 2, 3]
             symbol_pos = random.choice(symbol_positions)
-            
-            # Choose symbol - dot or underscore
             symbol = random.choice(CHARS["SYMBOLS"])
             
-            # Build the username
             username_chars = [first_char]
-            
             for pos in range(1, 5):
                 if pos == symbol_pos:
                     username_chars.append(symbol)
@@ -269,28 +249,12 @@ class AutoUsernameGenerator:
             
             username = ''.join(username_chars)
             
-            # Validate and ensure it's a semi-quad
             if (username not in self.generated_usernames and 
                 self.is_valid_instagram_username(username) and
                 self.is_semi_quad(username)):
                 self.generated_usernames.add(username)
                 return username
         
-        # Fallback: Generate a guaranteed semi-quad username
-        for _ in range(50):
-            username = (
-                random.choice(CHARS["LETTERS"]) +
-                random.choice(CHARS["ALL_VALID"]) +
-                random.choice(CHARS["SYMBOLS"]) +
-                random.choice(CHARS["ALL_VALID"]) +
-                random.choice(CHARS["ALL_VALID"])
-            )
-            if (username not in self.generated_usernames and 
-                self.is_valid_instagram_username(username)):
-                self.generated_usernames.add(username)
-                return username
-        
-        # Ultimate fallback with timestamp
         timestamp = int(time.time() * 1000) % 100
         username = f"{random.choice(CHARS['LETTERS'])}{timestamp:02d}_x"
         self.generated_usernames.add(username)
@@ -299,30 +263,36 @@ class AutoUsernameGenerator:
 
 class AutoInstagramChecker:
     """
-    Handles the HTTP communication with Instagram APIs.
-    Uses Rotating Proxies and Random User Agents.
+    HTTP Checker that uses a provided list of User-Agents rotationally.
     """
-    def __init__(self, clients):
+    def __init__(self, clients, user_agents_pool):
         self.clients = clients
+        self.user_agents_pool = user_agents_pool
+        self.ua_cycle = itertools.cycle(user_agents_pool)
+        self.used_agents = set() # Track unique used agents
     
-    def _get_random_headers(self):
-        """Generates headers with randomized device bandwidth/connection type."""
-        headers = HEADERS_TEMPLATE.copy()
-        headers['User-Agent'] = f'Instagram {random.choice(USER_AGENTS)}'
-        headers['X-IG-Connection-Type'] = random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G'])
-        headers['X-IG-Bandwidth-Speed-KBPS'] = str(random.randint(1000, 8000))
-        headers['X-IG-Bandwidth-TotalBytes-B'] = str(random.randint(500000, 5000000))
-        headers['X-IG-Bandwidth-TotalTime-MS'] = str(random.randint(50, 500))
+    def _get_headers(self, user_agent):
+        """Constructs headers with a SPECIFIC user agent."""
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept-Language': 'en-US',
+            'X-IG-Capabilities': 'AQ==',
+            'Accept-Encoding': 'gzip',
+            'User-Agent': user_agent,
+            'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G']),
+            'X-IG-Bandwidth-Speed-KBPS': str(random.randint(1000, 8000)),
+            'X-IG-Bandwidth-TotalBytes-B': str(random.randint(500000, 5000000)),
+            'X-IG-Bandwidth-TotalTime-MS': str(random.randint(50, 500))
+        }
         return headers
 
     async def check_username_availability(self, username):
-        """
-        Checks availability of a username using a random proxy client.
-        """
-        # Pick a random client from the pool
+        # Pick User-Agent from our per-session pool
+        current_ua = next(self.ua_cycle)
+        self.used_agents.add(current_ua)
+        
         client = random.choice(self.clients)
 
-        # Generate Fresh Device IDs for total anonymity
         data = {
             "email": CONFIG["FIXED_EMAIL"],
             "username": username,
@@ -332,83 +302,72 @@ class AutoInstagramChecker:
         }
         
         try:
-            # Short timeout (3s)
             response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"], 
-                headers=self._get_random_headers(), 
+                headers=self._get_headers(current_ua), 
                 data=data
             )
             response_text = response.text
             
             if '"spam"' in response_text or 'rate_limit_error' in response_text:
-                return False, response_text, "rate_limit"
+                return False, response_text, "rate_limit", current_ua
             
             is_available = '"email_is_taken"' in response_text
-            return is_available, response_text, None
+            return is_available, response_text, None, current_ua
             
         except (httpx.RequestError, httpx.TimeoutException):
-            # Proxy error or timeout is common, treat as not found/skip to keep moving
-            return False, "", "connection_error"
+            return False, "", "connection_error", current_ua
 
 
 class SearchSession:
     """
-    Orchestrates a single on-demand search request.
+    Each session generates its OWN 1000 User-Agents.
     """
     def __init__(self):
         self.generator = AutoUsernameGenerator()
-        
-        # Result State
         self.found_username = None
         self.result_reason = "timeout" 
-        
-        # Concurrency Control
         self.should_stop = False
         self.max_concurrency = CONFIG["MAX_CONCURRENCY"]
         self.start_time = 0
+        
+        # Stats
+        self.successful_ua = None
+        self.checker = None # Will hold the checker instance
 
-    async def _worker(self, checker):
-        """Code running inside each async worker."""
+    async def _worker(self):
         while not self.should_stop:
-            # 1. Check Timeout
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
                 self.should_stop = True
                 return
 
-            # 2. Generate
             username = self.generator.generate()
             
-            # 3. Check
-            is_available, _, error = await checker.check_username_availability(username)
+            # Use the checker instance created in run()
+            is_available, _, error, used_ua = await self.checker.check_username_availability(username)
             
-            # 4. Handle Result
             if self.should_stop:
                 return 
 
-            if error == "rate_limit":
-                # With proxies, a single 429 might not mean global stop.
-                # We continue with other proxies.
-                pass 
-            
             if is_available:
                 self.found_username = username
+                self.successful_ua = used_ua
                 self.result_reason = "success"
                 self.should_stop = True
                 return
             
-            # Minimal yield
             await asyncio.sleep(0.01)
 
     async def run(self):
-        """Starts the async task pool."""
         self.start_time = time.time()
         
-        # Initialize clients for each proxy
-        # We assume PROXIES_LIST has valid proxy URLs
+        # 1. Generate 1000 Unique Legacy User-Agents for THIS session
+        session_agents = generate_legacy_agents(1000)
+        
+        # 2. Setup Clients
         clients = []
         for proxy_url in PROXIES_LIST:
             try:
-                # httpx.AsyncClient manages the connection pool for this proxy
                 client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
                 clients.append(client)
             except Exception:
@@ -417,42 +376,39 @@ class SearchSession:
         if not clients:
             return {
                 "status": "failed",
-                "username": None,
-                "reason": "no_proxies_available",
-                "duration": 0
+                "reason": "no_proxies_available"
             }
 
-        checker = AutoInstagramChecker(clients)
+        # 3. Create Checker with the session-specific agents
+        self.checker = AutoInstagramChecker(clients, session_agents)
         
-        # Launch workers
-        tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
+        tasks = [asyncio.create_task(self._worker()) for _ in range(self.max_concurrency)]
         
-        # Wait for completion or stop
         while not self.should_stop:
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
                 self.should_stop = True
                 break
-            
-            # Check if all tasks finished (e.g. if we had limited attempts, but here we loop forever)
-            # Actually, we should check if we found something
             if self.found_username:
                 break
-                
             await asyncio.sleep(0.1)
 
-        # Ensure all tasks stop
         self.should_stop = True
         await asyncio.gather(*tasks, return_exceptions=True)
         
-        # Cleanup clients
         for c in clients:
             await c.aclose()
             
+        # Compile Stats
         return {
             "status": "success" if self.found_username else "failed",
             "username": self.found_username,
             "reason": self.result_reason if not self.found_username else None,
-            "duration": round(time.time() - self.start_time, 2)
+            "duration": round(time.time() - self.start_time, 2),
+            "stats": {
+                "generated_agents": len(session_agents),
+                "agents_used_count": len(self.checker.used_agents),
+                "successful_agent": self.successful_ua
+            }
         }
 
 
@@ -462,18 +418,14 @@ class SearchSession:
 
 @app.route('/')
 def home():
-    """Root endpoint for health checks."""
     return jsonify({
         "status": "online",
-        "message": "Instagram Checker API is running with Proxy Rotation.",
-        "usage": "Send GET request to /search to find a user."
+        "message": "Self-Contained Instagram Checker (Internal UA Gen)",
+        "usage": "Send GET request to /search"
     })
 
 @app.route('/search')
 async def search():
-    """
-    Triggers a search session.
-    """
     session = SearchSession()
     result = await session.run()
     return jsonify(result)
