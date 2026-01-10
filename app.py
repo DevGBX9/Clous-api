@@ -206,22 +206,69 @@ class AutoUsernameGenerator:
         
         return True
     
+    def is_semi_quad(self, username):
+        """
+        Checks if the username is a 'semi-quad' (contains at least one underscore or dot).
+        """
+        return '_' in username or '.' in username
+    
     def generate(self):
         """
-        Generates a unique, compliant 5-char username.
+        Generates a unique, compliant 5-char semi-quad username.
+        Semi-quad means it must contain at least one underscore or dot.
         """
-        max_attempts = 10
+        max_attempts = 100  # Increased attempts for semi-quad generation
+        
         for _ in range(max_attempts):
-            username = random.choice(CHARS["LETTERS"])
-            username += ''.join(random.choices(CHARS["ALL_VALID"], k=4))
+            # Start with a letter (Instagram requirement)
+            first_char = random.choice(CHARS["LETTERS"])
             
+            # Choose a random position (1-3) to insert a symbol (. or _)
+            # Position 0 is the first letter, position 4 is the last
+            # Dot cannot be at position 4 (end), underscore can be anywhere except start
+            symbol_positions = [1, 2, 3]  # Valid positions for symbols
+            symbol_pos = random.choice(symbol_positions)
+            
+            # Choose symbol - dot or underscore
+            # If position is 3 (second to last), we can still use dot since it won't be at end
+            symbol = random.choice(CHARS["SYMBOLS"])  # '.' or '_'
+            
+            # Build the username
+            username_chars = [first_char]
+            
+            for pos in range(1, 5):
+                if pos == symbol_pos:
+                    username_chars.append(symbol)
+                else:
+                    username_chars.append(random.choice(CHARS["ALL_VALID"]))
+            
+            username = ''.join(username_chars)
+            
+            # Validate and ensure it's a semi-quad
+            if (username not in self.generated_usernames and 
+                self.is_valid_instagram_username(username) and
+                self.is_semi_quad(username)):
+                self.generated_usernames.add(username)
+                return username
+        
+        # Fallback: Generate a guaranteed semi-quad username
+        # Format: letter + letter/digit + underscore + letter/digit + letter/digit
+        for _ in range(50):
+            username = (
+                random.choice(CHARS["LETTERS"]) +
+                random.choice(CHARS["ALL_VALID"]) +
+                random.choice(CHARS["SYMBOLS"]) +
+                random.choice(CHARS["ALL_VALID"]) +
+                random.choice(CHARS["ALL_VALID"])
+            )
             if (username not in self.generated_usernames and 
                 self.is_valid_instagram_username(username)):
                 self.generated_usernames.add(username)
                 return username
         
-        timestamp = int(time.time() * 1000) % 10000
-        username = f"{random.choice(CHARS['LETTERS'])}{timestamp:04d}"[:5]
+        # Ultimate fallback with timestamp
+        timestamp = int(time.time() * 1000) % 100
+        username = f"{random.choice(CHARS['LETTERS'])}{timestamp:02d}_x"
         self.generated_usernames.add(username)
         return username
 
