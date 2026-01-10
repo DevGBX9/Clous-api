@@ -149,10 +149,60 @@ PROXIES_LIST = [
 proxy_pool = itertools.cycle(PROXIES_LIST)
 
 # Expanded User Agents
+# Expanded User Agents (50+ Real Devices)
 USER_AGENTS = [
-    'Instagram 6.12.1 Android (30/11; 480dpi; 1080x2298; HONOR; ANY-LX2; HNANY-Q1; qcom; en_IQ)',
-    'Instagram 10.20.0 Android (28/9; 420dpi; 1080x1920; Samsung; SM-G930F; heroqltesq; qcom; en_US)',
-    'Instagram 9.7.0 Android (26/8; 480dpi; 1080x1920; OnePlus; ONEPLUS A6000; A6000; qcom; en_GB)',
+    # SAMSUNG - S23/S22/S21 Series
+    'Instagram 316.0.0.38.109 Android (34/14; 450dpi; 1080x2340; Samsung; SM-S911B; kalama; qcom; en_US)',
+    'Instagram 315.0.0.34.111 Android (33/13; 480dpi; 1080x2400; Samsung; SM-A546B; s5e8835; samsung; en_US)',
+    'Instagram 314.0.0.30.110 Android (33/13; 420dpi; 1080x2400; Samsung; SM-A346B; k6895v1_64; mt6877; en_US)',
+    'Instagram 313.0.0.28.108 Android (34/14; 560dpi; 1440x3088; Samsung; SM-S908B; b0q; samsung; en_US)',
+    'Instagram 312.0.0.26.107 Android (34/14; 440dpi; 1080x2316; Samsung; SM-S901B; r0q; samsung; en_US)',
+    'Instagram 311.0.0.32.118 Android (33/13; 450dpi; 1080x2400; Samsung; SM-G991B; o1s; samsung; en_US)',
+    'Instagram 310.0.0.28.115 Android (32/12; 420dpi; 1080x2400; Samsung; SM-G780G; r8q; samsung; en_US)',
+    
+    # GOOGLE PIXEL - 8/7/6 Series
+    'Instagram 316.0.0.38.109 Android (34/14; 560dpi; 1344x2992; Google; Pixel 8 Pro; husky; google; en_US)',
+    'Instagram 315.0.0.34.111 Android (34/14; 420dpi; 1080x2400; Google; Pixel 8; shiba; google; en_US)',
+    'Instagram 314.0.0.30.110 Android (34/14; 560dpi; 1440x3120; Google; Pixel 7 Pro; cheetah; google; en_US)',
+    'Instagram 313.0.0.28.108 Android (33/13; 411dpi; 1080x2400; Google; Pixel 7; panther; google; en_US)',
+    'Instagram 312.0.0.26.107 Android (33/13; 400dpi; 1080x2400; Google; Pixel 6a; bluejay; google; en_US)',
+    'Instagram 311.0.0.32.118 Android (33/13; 560dpi; 1440x3120; Google; Pixel 6 Pro; raven; google; en_US)',
+
+    # XIAOMI - 13/12/Redmi Note
+    'Instagram 316.0.0.38.109 Android (33/13; 490dpi; 1080x2400; Xiaomi; 2210132G; fuxi; qcom; en_US)',
+    'Instagram 315.0.0.34.111 Android (33/13; 440dpi; 1220x2712; Xiaomi; 23049PCD8G; socrates; qcom; en_US)',
+    'Instagram 314.0.0.30.110 Android (33/13; 393dpi; 1080x2400; Xiaomi; M2102J20SG; vayu; qcom; en_US)',
+    'Instagram 313.0.0.28.108 Android (32/12; 440dpi; 1080x2400; Xiaomi; M2101K6G; sweet; qcom; en_US)',
+    'Instagram 312.0.0.26.107 Android (33/13; 400dpi; 1080x2400; Redmi; 2201117TY; spes; qcom; en_US)',
+    'Instagram 318.0.0.22.112 Android (33/13; 395dpi; 1080x2400; POCO; 2201116PG; veux; qcom; en_US)',
+    
+    # ONEPLUS
+    'Instagram 316.0.0.38.109 Android (34/14; 480dpi; 1440x3216; OnePlus; CPH2551; salami; qcom; en_US)',
+    'Instagram 315.0.0.34.111 Android (34/14; 420dpi; 1080x2412; OnePlus; CPH2447; ovaltine; qcom; en_US)',
+    'Instagram 314.0.0.30.110 Android (33/13; 560dpi; 1440x3216; OnePlus; NE2213; lemonade; qcom; en_US)',
+    'Instagram 313.0.0.28.108 Android (33/13; 450dpi; 1080x2400; OnePlus; MT2111; martini; mt6893; en_US)',
+    
+    # MOTOROLA
+    'Instagram 316.0.0.38.109 Android (34/14; 420dpi; 1080x2400; motorola; motorola edge 40; taro; mt6891; en_US)',
+    'Instagram 315.0.0.34.111 Android (33/13; 400dpi; 1080x2400; motorola; moto g(60); hanoip; qcom; en_US)',
+    
+    # REALME
+    'Instagram 316.0.0.38.109 Android (34/14; 480dpi; 1080x2412; realme; RMX3771; RMX3771; mt6877; en_US)',
+    'Instagram 315.0.0.34.111 Android (33/13; 450dpi; 1080x2400; realme; RMX3363; RMX3363; qcom; en_US)',
+    
+    # OPPO
+    'Instagram 316.0.0.38.109 Android (34/14; 480dpi; 1200x2668; OPPO; CPH2437; CPH2437; qcom; en_US)',
+    'Instagram 315.0.0.34.111 Android (33/13; 420dpi; 1080x2400; OPPO; CPH2359; CPH2359; qcom; en_US)',
+    
+    # VIVO
+    'Instagram 316.0.0.38.109 Android (34/14; 440dpi; 1200x2800; vivo; V2219; V2219; mt6893; en_US)',
+    'Instagram 315.0.0.34.111 Android (33/13; 400dpi; 1080x2400; vivo; V2025; V2025; qcom; en_US)',
+    
+    # SONY
+    'Instagram 316.0.0.38.109 Android (34/14; 640dpi; 1644x3840; Sony; XQ-DQ72; PDX-234; qcom; en_US)',
+    'Instagram 315.0.0.34.111 Android (33/13; 420dpi; 1080x2520; Sony; XQ-DC72; PDX-233; qcom; en_US)',
+    
+    # OLDER BUT RELIABLE (Android 11/12)
     'Instagram 254.0.0.19.109 Android (31/12; 440dpi; 1080x2340; Samsung; SM-A525F; a52q; qcom; en_US)',
     'Instagram 223.0.0.12.102 Android (30/11; 420dpi; 1080x2400; Xiaomi; M2101K6G; sweet; qcom; en_US)',
     'Instagram 219.0.0.12.117 Android (29/10; 450dpi; 1080x2400; OPPO; CPH2083; OP4C2F; mt6765; en_IN)',
@@ -282,7 +332,10 @@ class AutoInstagramChecker:
     def _get_random_headers(self):
         """Generates headers with randomized device bandwidth/connection type."""
         headers = HEADERS_TEMPLATE.copy()
-        headers['User-Agent'] = f'Instagram {random.choice(USER_AGENTS)}'
+        # The new USER_AGENTS list already contains the full string "Instagram ... "
+        # so we don't need to prepend 'Instagram ' anymore if the list has it.
+        # However, checking the list above, they start with 'Instagram'.
+        headers['User-Agent'] = random.choice(USER_AGENTS)
         headers['X-IG-Connection-Type'] = random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G'])
         headers['X-IG-Bandwidth-Speed-KBPS'] = str(random.randint(1000, 8000))
         headers['X-IG-Bandwidth-TotalBytes-B'] = str(random.randint(500000, 5000000))
