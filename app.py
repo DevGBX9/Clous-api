@@ -203,23 +203,16 @@ CORS(app)
 
 def create_secure_client(proxy_url: str) -> httpx.AsyncClient:
     """
-    Create a secure HTTP client that routes ALL traffic through proxy.
-    NO IP LEAKAGE - DNS resolution also goes through proxy.
+    Create a secure HTTP client.
+    Uses standard httpx client which proved more stable with these proxies.
+    trust_env=False ensures no local IP leak.
     """
-    transport = httpx.AsyncHTTPTransport(
+    return httpx.AsyncClient(
         proxy=proxy_url,
-        verify=True,
-        retries=0, # No fallback to direct connection
-    )
-    
-    client = httpx.AsyncClient(
-        transport=transport,
         timeout=httpx.Timeout(10.0, connect=5.0),
         trust_env=False, # Ignore system proxies/env vars
-        http2=False, # Better for stealth (looks more like standard App requests)
+        follow_redirects=True
     )
-    
-    return client
 
 
 class AutoUsernameGenerator:
