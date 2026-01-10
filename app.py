@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Instagram Username Checker - Self-Contained API
-===============================================
+Instagram Username Checker - Ultimate Stealth Edition
+===================================================
 
 Features:
 - On-Demand Search: Triggered via /search endpoint.
-- Self-Contained: Generates valid legacy User-Agents internally (no external file needed).
-- Security: Rotates 1000 unique User-Agents PER SEARCH request.
-- Stats: Returns detailed info on which UA found the username.
-- Anonymity: Rotating Proxies, Random User-Agents, Dynamic Device IDs.
+- Self-Contained: Generates 1000 Valid Legacy User-Agents internally.
+- Full Device Fingerprint: Generates COMPLETE Android Identity (IDs, ADIDs, GUIDs) per request.
+- Security: Rotates Identity + Proxy + User-Agent for every single check.
+- Stats: Detailed reporting of used agents.
 
 Author: @GBX_9
 """
@@ -21,6 +21,8 @@ import random
 import asyncio
 import httpx
 import itertools
+import json
+import threading
 from uuid import uuid4
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -38,7 +40,6 @@ CONFIG = {
     "MAX_CONCURRENCY": 50,
 }
 
-# Values for username generation
 CHARS = {
     "LETTERS": 'abcdefghijklmnopqrstuvwxyz',
     "DIGITS": '0123456789',
@@ -46,7 +47,6 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-# Rotating Proxies
 PROXIES_LIST = [
     "http://mpdmbsys:r36zb0uyv1ls@142.111.48.253:7030",
     "http://mpdmbsys:r36zb0uyv1ls@23.95.150.145:6114",
@@ -146,7 +146,6 @@ proxy_pool = itertools.cycle(PROXIES_LIST)
 # ==========================================
 #      LEGACY UA GENERATOR (INTERNAL)
 # ==========================================
-# Components for generating valid legacy User-Agents (Safe from signing)
 UA_INSTAGRAM_VERSIONS = [
     f"{major}.{minor}.{patch}" 
     for major in range(10, 120, 2)
@@ -170,7 +169,6 @@ UA_DEVICES = [
     {"brand": "Xiaomi", "model": "Redmi Note 5", "device": "whyred", "cpu": "qcom"},
     {"brand": "Xiaomi", "model": "MI 8", "device": "dipper", "cpu": "qcom"},
     {"brand": "Huawei", "model": "ANE-LX1", "device": "HWANE", "cpu": "hisilicon"},
-    # We can add more here if needed, but this combination creates thousands of variants
 ]
 
 UA_RESOLUTIONS = ["1080x1920", "1080x2240", "1080x2340", "720x1280", "1440x2560"]
@@ -182,7 +180,6 @@ def generate_legacy_agents(count=1000):
     agents = []
     seen = set()
     attempts = 0
-    # Add safety to avoid infinite loops if pool is exhausted
     while len(agents) < count and attempts < count * 5:
         attempts += 1
         app_ver = random.choice(UA_INSTAGRAM_VERSIONS)
@@ -264,13 +261,37 @@ class AutoUsernameGenerator:
 class AutoInstagramChecker:
     """
     HTTP Checker that uses a provided list of User-Agents rotationally.
+    NOW ENHANCED: Simulates FULL Device Fingerprint per request.
     """
     def __init__(self, clients, user_agents_pool):
         self.clients = clients
         self.user_agents_pool = user_agents_pool
         self.ua_cycle = itertools.cycle(user_agents_pool)
-        self.used_agents = set() # Track unique used agents
+        self.used_agents = set()
     
+    def _generate_device_payload(self, username, device_id):
+        """
+        Generates a COMPREHENSIVE Android Device Identity.
+        This simulates what the App actually sends.
+        """
+        # Generate consistent IDs for this "Session"
+        phone_id = str(uuid4())
+        adid = str(uuid4()) # Advertising ID
+        guid = str(uuid4())
+        
+        return {
+            "email": CONFIG["FIXED_EMAIL"],
+            "username": username,
+            "password": f"Aa123456{username}",
+            "device_id": device_id,  # Main Android Device ID
+            "phone_id": phone_id,    # Instance ID
+            "adid": adid,            # Advertising ID (Critical for validation)
+            "guid": guid,            # Generic UUID
+            "google_adid": adid,     # Often mirrors 'adid'
+            "first_name": username,  # Metadata mostly ignored but good for realism
+            "waterfall_id": str(uuid4()) # Traceability ID often used by IG
+        }
+
     def _get_headers(self, user_agent):
         """Constructs headers with a SPECIFIC user agent."""
         headers = {
@@ -292,14 +313,14 @@ class AutoInstagramChecker:
         self.used_agents.add(current_ua)
         
         client = random.choice(self.clients)
+        
+        # Generate unique Android Device ID
+        # Format can be 'android-'+16hex OR a UUID, old versions accept both.
+        # We stick to uuid as it's cleaner.
+        device_id = f"android-{uuid4()}"
 
-        data = {
-            "email": CONFIG["FIXED_EMAIL"],
-            "username": username,
-            "password": f"Aa123456{username}",
-            "device_id": f"android-{uuid4()}",
-            "guid": str(uuid4()),
-        }
+        # Generate FULL Payload
+        data = self._generate_device_payload(username, device_id)
         
         try:
             response = await client.post(
@@ -320,9 +341,6 @@ class AutoInstagramChecker:
 
 
 class SearchSession:
-    """
-    Each session generates its OWN 1000 User-Agents.
-    """
     def __init__(self):
         self.generator = AutoUsernameGenerator()
         self.found_username = None
@@ -330,10 +348,8 @@ class SearchSession:
         self.should_stop = False
         self.max_concurrency = CONFIG["MAX_CONCURRENCY"]
         self.start_time = 0
-        
-        # Stats
         self.successful_ua = None
-        self.checker = None # Will hold the checker instance
+        self.checker = None
 
     async def _worker(self):
         while not self.should_stop:
@@ -343,7 +359,6 @@ class SearchSession:
 
             username = self.generator.generate()
             
-            # Use the checker instance created in run()
             is_available, _, error, used_ua = await self.checker.check_username_availability(username)
             
             if self.should_stop:
@@ -379,9 +394,7 @@ class SearchSession:
                 "reason": "no_proxies_available"
             }
 
-        # 3. Create Checker with the session-specific agents
         self.checker = AutoInstagramChecker(clients, session_agents)
-        
         tasks = [asyncio.create_task(self._worker()) for _ in range(self.max_concurrency)]
         
         while not self.should_stop:
@@ -398,7 +411,6 @@ class SearchSession:
         for c in clients:
             await c.aclose()
             
-        # Compile Stats
         return {
             "status": "success" if self.found_username else "failed",
             "username": self.found_username,
@@ -420,12 +432,13 @@ class SearchSession:
 def home():
     return jsonify({
         "status": "online",
-        "message": "Self-Contained Instagram Checker (Internal UA Gen)",
+        "message": "Instagram Checker: Ultimate Stealth (Full Device Simulation)",
         "usage": "Send GET request to /search"
     })
 
 @app.route('/search')
 async def search():
+    """Triggers a search session with fresh Device Identities."""
     session = SearchSession()
     result = await session.run()
     return jsonify(result)
