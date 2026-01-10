@@ -24,7 +24,6 @@ import random
 import asyncio
 import httpx
 import hashlib
-import itertools
 from uuid import uuid4
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -39,7 +38,7 @@ CONFIG = {
     "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
     "TIMEOUT_SECONDS": 30,
     "FIXED_EMAIL": "abdo1@gmail.com",
-    "MAX_CONCURRENCY": 100,
+    "MAX_CONCURRENCY": 50,  # Reduced for stability
 }
 
 # Values for username generation
@@ -148,7 +147,6 @@ PROXIES_LIST = [
 #       REALISTIC DEVICE CONFIGURATIONS
 # ==========================================
 
-# Real Android devices with complete specifications
 ANDROID_DEVICES = [
     {
         "manufacturer": "Samsung",
@@ -210,145 +208,51 @@ ANDROID_DEVICES = [
         "resolution": "1080x2412",
         "chipset": "qcom"
     },
-    {
-        "manufacturer": "OPPO",
-        "model": "CPH2525",
-        "device": "OP5961L1",
-        "android_version": 33,
-        "android_release": "13",
-        "dpi": "480dpi",
-        "resolution": "1080x2412",
-        "chipset": "qcom"
-    },
-    {
-        "manufacturer": "realme",
-        "model": "RMX3771",
-        "device": "RE58B2L1",
-        "android_version": 33,
-        "android_release": "13",
-        "dpi": "420dpi",
-        "resolution": "1080x2400",
-        "chipset": "qcom"
-    },
-    {
-        "manufacturer": "vivo",
-        "model": "V2254",
-        "device": "PD2254",
-        "android_version": 33,
-        "android_release": "13",
-        "dpi": "480dpi",
-        "resolution": "1080x2400",
-        "chipset": "qcom"
-    },
-    {
-        "manufacturer": "HUAWEI",
-        "model": "NOH-NX9",
-        "device": "HWNOH",
-        "android_version": 31,
-        "android_release": "12",
-        "dpi": "480dpi",
-        "resolution": "1080x2376",
-        "chipset": "kirin"
-    },
-    {
-        "manufacturer": "Samsung",
-        "model": "SM-A546B",
-        "device": "a54x",
-        "android_version": 34,
-        "android_release": "14",
-        "dpi": "420dpi",
-        "resolution": "1080x2340",
-        "chipset": "exynos"
-    },
-    {
-        "manufacturer": "Motorola",
-        "model": "moto g84 5G",
-        "device": "bangkk",
-        "android_version": 33,
-        "android_release": "13",
-        "dpi": "400dpi",
-        "resolution": "1080x2400",
-        "chipset": "qcom"
-    },
 ]
 
-# Instagram app versions (realistic recent versions)
 INSTAGRAM_VERSIONS = [
     "326.0.0.42.90",
     "325.0.0.35.91",
     "324.0.0.27.50",
     "323.0.0.38.64",
-    "322.0.0.37.65",
-    "321.0.0.39.106",
-    "320.0.0.36.84",
-    "319.0.0.43.110",
-    "318.0.0.38.108",
-    "317.0.0.34.109",
 ]
 
-# Locales for diversity
 LOCALES = [
-    ("en_US", "America/New_York", -18000),
-    ("en_GB", "Europe/London", 0),
-    ("en_AU", "Australia/Sydney", 39600),
-    ("en_CA", "America/Toronto", -18000),
-    ("de_DE", "Europe/Berlin", 3600),
-    ("fr_FR", "Europe/Paris", 3600),
-    ("es_ES", "Europe/Madrid", 3600),
-    ("it_IT", "Europe/Rome", 3600),
-    ("pt_BR", "America/Sao_Paulo", -10800),
-    ("ar_SA", "Asia/Riyadh", 10800),
-    ("ar_AE", "Asia/Dubai", 14400),
-    ("ja_JP", "Asia/Tokyo", 32400),
-    ("ko_KR", "Asia/Seoul", 32400),
-    ("zh_CN", "Asia/Shanghai", 28800),
-    ("hi_IN", "Asia/Kolkata", 19800),
-    ("tr_TR", "Europe/Istanbul", 10800),
-    ("nl_NL", "Europe/Amsterdam", 3600),
-    ("pl_PL", "Europe/Warsaw", 3600),
-    ("ru_RU", "Europe/Moscow", 10800),
-    ("id_ID", "Asia/Jakarta", 25200),
+    ("en_US", -18000),
+    ("en_GB", 0),
+    ("ar_SA", 10800),
+    ("ar_AE", 14400),
+    ("de_DE", 3600),
+    ("fr_FR", 3600),
 ]
 
 
 class DeviceFingerprint:
     """
     Generates and maintains a complete, realistic Android device fingerprint.
-    Each proxy gets a persistent device identity to simulate real user behavior.
     """
     
     def __init__(self, proxy_url: str):
-        # Create deterministic but unique IDs based on proxy URL
         self.seed = hashlib.md5(proxy_url.encode()).hexdigest()
         random.seed(self.seed)
         
-        # Select a random device configuration
         self.device = random.choice(ANDROID_DEVICES)
         self.ig_version = random.choice(INSTAGRAM_VERSIONS)
-        self.locale, self.timezone, self.timezone_offset = random.choice(LOCALES)
+        self.locale, self.timezone_offset = random.choice(LOCALES)
         
-        # Generate persistent device IDs (these stay constant per proxy)
         self.android_id = self._generate_android_id()
         self.device_id = f"android-{self.android_id}"
         self.phone_id = str(uuid4())
         self.uuid = str(uuid4())
         self.advertising_id = str(uuid4())
-        self.family_device_id = str(uuid4())
         
-        # Session-specific IDs (can rotate)
-        self.pigeon_session_id = f"UFS-{uuid4()}-0"
-        self.session_id = str(uuid4())
-        
-        # Reset random seed
         random.seed()
     
     def _generate_android_id(self) -> str:
-        """Generate a realistic 16-character Android ID."""
         chars = '0123456789abcdef'
         return ''.join(random.choice(chars) for _ in range(16))
     
     def get_user_agent(self) -> str:
-        """Generate realistic Instagram User-Agent."""
         d = self.device
         return (
             f"Instagram {self.ig_version} "
@@ -360,105 +264,45 @@ class DeviceFingerprint:
         )
     
     def get_headers(self) -> dict:
-        """Generate complete Instagram-like headers."""
-        current_time = time.time()
-        
         return {
-            # Core headers
             'User-Agent': self.get_user_agent(),
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'Accept-Encoding': 'gzip, deflate',
             'Accept-Language': self.locale.replace('_', '-'),
-            
-            # Instagram-specific device headers
             'X-IG-Device-ID': self.phone_id,
             'X-IG-Android-ID': self.device_id,
-            'X-IG-Family-Device-ID': self.family_device_id,
             'X-IG-Timezone-Offset': str(self.timezone_offset),
-            
-            # Connection and capabilities
-            'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE(LTE)', 'MOBILE(5G)']),
+            'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE(LTE)']),
             'X-IG-Capabilities': '3brTv10=',
             'X-IG-App-Locale': self.locale,
             'X-IG-Device-Locale': self.locale,
-            'X-IG-Mapped-Locale': self.locale,
-            'X-IG-App-Startup-Country': self.locale.split('_')[1],
-            
-            # Bandwidth (realistic values)
-            'X-IG-Bandwidth-Speed-KBPS': str(random.randint(7000, 25000)),
-            'X-IG-Bandwidth-TotalBytes-B': str(random.randint(1000000, 8000000)),
-            'X-IG-Bandwidth-TotalTime-MS': str(random.randint(100, 800)),
-            
-            # Session tracking
-            'X-Pigeon-Session-Id': self.pigeon_session_id,
-            'X-Pigeon-Rawclienttime': f"{current_time:.3f}",
-            
-            # App identification
             'X-IG-App-ID': '567067343352427',
             'X-FB-HTTP-Engine': 'Liger',
-            'X-FB-Client-IP': 'True',
-            'X-FB-Server-Cluster': 'True',
-            
-            # Additional realistic headers
-            'X-Bloks-Version-Id': self._generate_bloks_version(),
-            'X-Bloks-Is-Layout-RTL': 'false',
-            'X-Bloks-Is-Panorama-Enabled': 'true',
-            'X-IG-WWW-Claim': '0',
-            'X-IG-Connection-Speed': f'{random.randint(1000, 5000)}kbps',
-            
-            # Priority header
-            'Priority': 'u=3',
         }
     
-    def _generate_bloks_version(self) -> str:
-        """Generate a realistic Bloks version ID."""
-        hash_chars = '0123456789abcdef'
-        return ''.join(random.choice(hash_chars) for _ in range(64))
-    
     def get_request_data(self, username: str) -> dict:
-        """Generate complete request payload."""
         return {
             "email": CONFIG["FIXED_EMAIL"],
             "username": username,
-            "password": f"Aa@{username}2024!",
+            "password": f"Aa123456{username}",
             "device_id": self.device_id,
             "guid": self.uuid,
             "phone_id": self.phone_id,
             "waterfall_id": str(uuid4()),
             "adid": self.advertising_id,
-            "first_name": "",
-            "seamless_login_enabled": "1",
-            "force_sign_up_code": "",
-            "qs_stamp": "",
-            "one_tap_opt_in": "true",
         }
-    
-    def rotate_session(self):
-        """Rotate session-specific IDs for next request."""
-        self.pigeon_session_id = f"UFS-{uuid4()}-0"
 
-
-# ==========================================
-#       PROXY SESSION MANAGER
-# ==========================================
 
 class ProxySessionManager:
-    """
-    Manages persistent device identities for each proxy.
-    Each proxy = one virtual Android device.
-    """
-    
     def __init__(self):
-        self.sessions: dict[str, DeviceFingerprint] = {}
+        self.sessions = {}
     
     def get_fingerprint(self, proxy_url: str) -> DeviceFingerprint:
-        """Get or create a device fingerprint for a proxy."""
         if proxy_url not in self.sessions:
             self.sessions[proxy_url] = DeviceFingerprint(proxy_url)
         return self.sessions[proxy_url]
 
 
-# Global session manager
 proxy_manager = ProxySessionManager()
 
 
@@ -474,16 +318,10 @@ CORS(app)
 # ==========================================
 
 class AutoUsernameGenerator:
-    """
-    Responsible for generating valid 5-character Instagram usernames.
-    """
     def __init__(self):
         self.generated_usernames = set()
     
     def is_valid_instagram_username(self, username):
-        """
-        Validates username against Instagram's rules.
-        """
         if len(username) != 5:
             return False
         
@@ -503,16 +341,9 @@ class AutoUsernameGenerator:
         return True
     
     def is_semi_quad(self, username):
-        """
-        Checks if the username is a 'semi-quad' (contains at least one underscore or dot).
-        """
         return '_' in username or '.' in username
     
     def generate(self):
-        """
-        Generates a unique, compliant 5-char semi-quad username.
-        Semi-quad means it must contain at least one underscore or dot.
-        """
         max_attempts = 100
         
         for _ in range(max_attempts):
@@ -537,7 +368,6 @@ class AutoUsernameGenerator:
                 self.generated_usernames.add(username)
                 return username
         
-        # Fallback
         for _ in range(50):
             username = (
                 random.choice(CHARS["LETTERS"]) +
@@ -558,21 +388,13 @@ class AutoUsernameGenerator:
 
 
 class AutoInstagramChecker:
-    """
-    Handles the HTTP communication with Instagram APIs.
-    Uses complete device fingerprints and realistic headers.
-    """
-    def __init__(self, proxy_clients: list):
-        self.proxy_clients = proxy_clients  # List of (client, proxy_url, fingerprint)
+    def __init__(self, proxy_clients: list, stats: dict):
+        self.proxy_clients = proxy_clients
+        self.stats = stats
     
     async def check_username_availability(self, username: str):
-        """
-        Checks availability of a username using a random proxy with full device fingerprint.
-        """
-        # Pick a random proxy session
         client, proxy_url, fingerprint = random.choice(self.proxy_clients)
         
-        # Get realistic headers and data
         headers = fingerprint.get_headers()
         data = fingerprint.get_request_data(username)
         
@@ -583,24 +405,54 @@ class AutoInstagramChecker:
                 data=data
             )
             response_text = response.text
+            self.stats["total_requests"] += 1
             
-            # Rotate session for next request (slight variation)
-            fingerprint.rotate_session()
+            # Debug: print first response
+            if self.stats["total_requests"] == 1:
+                self.stats["sample_response"] = response_text[:500]
             
-            if '"spam"' in response_text or 'rate_limit_error' in response_text:
+            # Check for various error indicators
+            if '"spam"' in response_text:
+                self.stats["spam_errors"] += 1
+                return False, response_text, "spam"
+            
+            if 'rate_limit' in response_text.lower():
+                self.stats["rate_limits"] += 1
                 return False, response_text, "rate_limit"
             
-            is_available = '"email_is_taken"' in response_text
-            return is_available, response_text, None
+            if 'challenge_required' in response_text:
+                self.stats["challenges"] += 1
+                return False, response_text, "challenge"
             
-        except (httpx.RequestError, httpx.TimeoutException):
+            # Username is AVAILABLE if email_is_taken appears
+            # (means the username passed validation, only email is the issue)
+            if '"email_is_taken"' in response_text:
+                self.stats["available_found"] += 1
+                return True, response_text, None
+            
+            # Username is TAKEN if username_is_taken appears
+            if '"username_is_taken"' in response_text or 'username' in response_text.lower():
+                self.stats["username_taken"] += 1
+                return False, response_text, "taken"
+            
+            # Other responses
+            self.stats["other_responses"] += 1
+            return False, response_text, "other"
+            
+        except httpx.TimeoutException:
+            self.stats["timeouts"] += 1
+            return False, "", "timeout"
+        except httpx.RequestError as e:
+            self.stats["connection_errors"] += 1
+            self.stats["last_error"] = str(e)[:100]
             return False, "", "connection_error"
+        except Exception as e:
+            self.stats["other_errors"] += 1
+            self.stats["last_error"] = str(e)[:100]
+            return False, "", "error"
 
 
 class SearchSession:
-    """
-    Orchestrates a single on-demand search request.
-    """
     def __init__(self):
         self.generator = AutoUsernameGenerator()
         
@@ -610,9 +462,24 @@ class SearchSession:
         self.should_stop = False
         self.max_concurrency = CONFIG["MAX_CONCURRENCY"]
         self.start_time = 0
+        
+        # Statistics for debugging
+        self.stats = {
+            "total_requests": 0,
+            "available_found": 0,
+            "username_taken": 0,
+            "spam_errors": 0,
+            "rate_limits": 0,
+            "challenges": 0,
+            "timeouts": 0,
+            "connection_errors": 0,
+            "other_responses": 0,
+            "other_errors": 0,
+            "sample_response": "",
+            "last_error": "",
+        }
 
     async def _worker(self, checker):
-        """Code running inside each async worker."""
         while not self.should_stop:
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
                 self.should_stop = True
@@ -624,9 +491,6 @@ class SearchSession:
             
             if self.should_stop:
                 return 
-
-            if error == "rate_limit":
-                pass 
             
             if is_available:
                 self.found_username = username
@@ -634,31 +498,30 @@ class SearchSession:
                 self.should_stop = True
                 return
             
-            await asyncio.sleep(0.005)
+            await asyncio.sleep(0.01)
 
     async def run(self):
-        """Starts the async task pool."""
         self.start_time = time.time()
         
-        # Initialize clients with fingerprints
         proxy_clients = []
         for proxy_url in PROXIES_LIST:
             try:
                 fingerprint = proxy_manager.get_fingerprint(proxy_url)
-                client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
+                client = httpx.AsyncClient(proxy=proxy_url, timeout=5.0)
                 proxy_clients.append((client, proxy_url, fingerprint))
-            except Exception:
-                continue
+            except Exception as e:
+                pass
         
         if not proxy_clients:
             return {
                 "status": "failed",
                 "username": None,
                 "reason": "no_proxies_available",
-                "duration": 0
+                "duration": 0,
+                "stats": self.stats
             }
 
-        checker = AutoInstagramChecker(proxy_clients)
+        checker = AutoInstagramChecker(proxy_clients, self.stats)
         
         tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
         
@@ -682,7 +545,8 @@ class SearchSession:
             "status": "success" if self.found_username else "failed",
             "username": self.found_username,
             "reason": self.result_reason if not self.found_username else None,
-            "duration": round(time.time() - self.start_time, 2)
+            "duration": round(time.time() - self.start_time, 2),
+            "stats": self.stats
         }
 
 
@@ -692,24 +556,15 @@ class SearchSession:
 
 @app.route('/')
 def home():
-    """Root endpoint for health checks."""
     return jsonify({
         "status": "online",
-        "message": "Instagram Checker API - Anti-Rate-Limit Edition",
+        "message": "Instagram Checker API - Debug Edition",
         "usage": "Send GET request to /search to find a user.",
-        "features": [
-            "Full device fingerprints",
-            "Realistic Android headers",
-            "Session persistence per proxy",
-            "90+ proxies available"
-        ]
+        "proxies_count": len(PROXIES_LIST)
     })
 
 @app.route('/search')
 async def search():
-    """
-    Triggers a search session.
-    """
     session = SearchSession()
     result = await session.run()
     return jsonify(result)
