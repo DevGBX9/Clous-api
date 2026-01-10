@@ -1,20 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Instagram Username Checker - On-Demand API (Anti-Rate-Limit Edition)
-=====================================================================
+Instagram Username Checker - On-Demand API
+==========================================
 
-This script runs a Flask API that checks for available 5-character Instagram usernames.
-It is designed to be deployed on serverless/container environments like Render.
-
-Features:
-- On-Demand Search: Triggered via /search endpoint.
-- High Concurrency: Uses asyncio for rapid checking.
-- Smart Stopping: Stops immediately upon finding a user, hitting a rate limit, or timing out.
-- Advanced Anti-Detection: Full device fingerprints, realistic headers, session persistence.
-- Anonymity: Rotating Proxies, Random User-Agents, Dynamic Device IDs.
-
-Author: @GBX_9 (Original Helper)
+Uses Instagram Web API for reliable username checking.
 """
 
 import os
@@ -28,20 +18,18 @@ from uuid import uuid4
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-# Prevent Python from writing __pycache__ bytecode files
 sys.dont_write_bytecode = True
 
 # ==========================================
 #              CONFIGURATION
 # ==========================================
 CONFIG = {
-    "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
+    # Web API endpoint - more reliable
+    "CHECK_USERNAME_URL": "https://www.instagram.com/api/v1/web/accounts/web_create_ajax/attempt/",
     "TIMEOUT_SECONDS": 30,
-    "FIXED_EMAIL": "abdo1@gmail.com",
-    "MAX_CONCURRENCY": 50,  # Reduced for stability
+    "MAX_CONCURRENCY": 30,
 }
 
-# Values for username generation
 CHARS = {
     "LETTERS": 'abcdefghijklmnopqrstuvwxyz',
     "DIGITS": '0123456789',
@@ -49,7 +37,7 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-# Rotating Proxies (Format: http://user:pass@ip:port)
+# Rotating Proxies
 PROXIES_LIST = [
     "http://mpdmbsys:r36zb0uyv1ls@142.111.48.253:7030",
     "http://mpdmbsys:r36zb0uyv1ls@23.95.150.145:6114",
@@ -143,167 +131,15 @@ PROXIES_LIST = [
     "http://idzfeaih:tg11yrege1lz@23.27.208.120:5830",
 ]
 
-# ==========================================
-#       REALISTIC DEVICE CONFIGURATIONS
-# ==========================================
-
-ANDROID_DEVICES = [
-    {
-        "manufacturer": "Samsung",
-        "model": "SM-G998B",
-        "device": "p3s",
-        "android_version": 33,
-        "android_release": "13",
-        "dpi": "560dpi",
-        "resolution": "1440x3200",
-        "chipset": "exynos"
-    },
-    {
-        "manufacturer": "Samsung",
-        "model": "SM-S918B",
-        "device": "dm3q",
-        "android_version": 34,
-        "android_release": "14",
-        "dpi": "480dpi",
-        "resolution": "1080x2340",
-        "chipset": "qcom"
-    },
-    {
-        "manufacturer": "Google",
-        "model": "Pixel 8 Pro",
-        "device": "husky",
-        "android_version": 34,
-        "android_release": "14",
-        "dpi": "560dpi",
-        "resolution": "1344x2992",
-        "chipset": "google"
-    },
-    {
-        "manufacturer": "Google",
-        "model": "Pixel 7",
-        "device": "panther",
-        "android_version": 34,
-        "android_release": "14",
-        "dpi": "420dpi",
-        "resolution": "1080x2400",
-        "chipset": "google"
-    },
-    {
-        "manufacturer": "Xiaomi",
-        "model": "2304FPN6DC",
-        "device": "fuxi",
-        "android_version": 33,
-        "android_release": "13",
-        "dpi": "440dpi",
-        "resolution": "1080x2400",
-        "chipset": "qcom"
-    },
-    {
-        "manufacturer": "OnePlus",
-        "model": "CPH2449",
-        "device": "OP5958L1",
-        "android_version": 33,
-        "android_release": "13",
-        "dpi": "480dpi",
-        "resolution": "1080x2412",
-        "chipset": "qcom"
-    },
+# Web User Agents (Chrome on Android)
+WEB_USER_AGENTS = [
+    "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 ]
-
-INSTAGRAM_VERSIONS = [
-    "326.0.0.42.90",
-    "325.0.0.35.91",
-    "324.0.0.27.50",
-    "323.0.0.38.64",
-]
-
-LOCALES = [
-    ("en_US", -18000),
-    ("en_GB", 0),
-    ("ar_SA", 10800),
-    ("ar_AE", 14400),
-    ("de_DE", 3600),
-    ("fr_FR", 3600),
-]
-
-
-class DeviceFingerprint:
-    """
-    Generates and maintains a complete, realistic Android device fingerprint.
-    """
-    
-    def __init__(self, proxy_url: str):
-        self.seed = hashlib.md5(proxy_url.encode()).hexdigest()
-        random.seed(self.seed)
-        
-        self.device = random.choice(ANDROID_DEVICES)
-        self.ig_version = random.choice(INSTAGRAM_VERSIONS)
-        self.locale, self.timezone_offset = random.choice(LOCALES)
-        
-        self.android_id = self._generate_android_id()
-        self.device_id = f"android-{self.android_id}"
-        self.phone_id = str(uuid4())
-        self.uuid = str(uuid4())
-        self.advertising_id = str(uuid4())
-        
-        random.seed()
-    
-    def _generate_android_id(self) -> str:
-        chars = '0123456789abcdef'
-        return ''.join(random.choice(chars) for _ in range(16))
-    
-    def get_user_agent(self) -> str:
-        d = self.device
-        return (
-            f"Instagram {self.ig_version} "
-            f"Android ({d['android_version']}/{d['android_release']}; "
-            f"{d['dpi']}; {d['resolution']}; "
-            f"{d['manufacturer']}; {d['model']}; "
-            f"{d['device']}; {d['chipset']}; {self.locale}; "
-            f"{random.randint(500000000, 600000000)})"
-        )
-    
-    def get_headers(self) -> dict:
-        return {
-            'User-Agent': self.get_user_agent(),
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Accept-Encoding': 'gzip, deflate',
-            'Accept-Language': self.locale.replace('_', '-'),
-            'X-IG-Device-ID': self.phone_id,
-            'X-IG-Android-ID': self.device_id,
-            'X-IG-Timezone-Offset': str(self.timezone_offset),
-            'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE(LTE)']),
-            'X-IG-Capabilities': '3brTv10=',
-            'X-IG-App-Locale': self.locale,
-            'X-IG-Device-Locale': self.locale,
-            'X-IG-App-ID': '567067343352427',
-            'X-FB-HTTP-Engine': 'Liger',
-        }
-    
-    def get_request_data(self, username: str) -> dict:
-        return {
-            "email": CONFIG["FIXED_EMAIL"],
-            "username": username,
-            "password": f"Aa123456{username}",
-            "device_id": self.device_id,
-            "guid": self.uuid,
-            "phone_id": self.phone_id,
-            "waterfall_id": str(uuid4()),
-            "adid": self.advertising_id,
-        }
-
-
-class ProxySessionManager:
-    def __init__(self):
-        self.sessions = {}
-    
-    def get_fingerprint(self, proxy_url: str) -> DeviceFingerprint:
-        if proxy_url not in self.sessions:
-            self.sessions[proxy_url] = DeviceFingerprint(proxy_url)
-        return self.sessions[proxy_url]
-
-
-proxy_manager = ProxySessionManager()
 
 
 # ==========================================
@@ -387,55 +223,134 @@ class AutoUsernameGenerator:
         return username
 
 
-class AutoInstagramChecker:
+class WebInstagramChecker:
+    """Uses Instagram Web API for checking usernames."""
+    
     def __init__(self, proxy_clients: list, stats: dict):
         self.proxy_clients = proxy_clients
         self.stats = stats
+        self.csrf_tokens = {}
+    
+    def _get_headers(self, csrf_token: str = None) -> dict:
+        headers = {
+            'User-Agent': random.choice(WEB_USER_AGENTS),
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://www.instagram.com',
+            'Referer': 'https://www.instagram.com/accounts/emailsignup/',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-IG-App-ID': '936619743392459',
+            'X-ASBD-ID': '129477',
+            'X-IG-WWW-Claim': '0',
+        }
+        if csrf_token:
+            headers['X-CSRFToken'] = csrf_token
+        return headers
+    
+    async def _get_csrf_token(self, client) -> str:
+        """Get CSRF token from Instagram."""
+        try:
+            response = await client.get(
+                'https://www.instagram.com/accounts/emailsignup/',
+                headers={
+                    'User-Agent': random.choice(WEB_USER_AGENTS),
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                }
+            )
+            
+            # Extract csrf token from cookies
+            cookies = response.cookies
+            csrf = cookies.get('csrftoken', '')
+            if csrf:
+                return csrf
+            
+            # Try to extract from response
+            text = response.text
+            if 'csrf_token' in text:
+                import re
+                match = re.search(r'"csrf_token":"([^"]+)"', text)
+                if match:
+                    return match.group(1)
+            
+            # Generate a random one as fallback
+            return hashlib.md5(str(uuid4()).encode()).hexdigest()[:32]
+            
+        except Exception:
+            return hashlib.md5(str(uuid4()).encode()).hexdigest()[:32]
     
     async def check_username_availability(self, username: str):
-        client, proxy_url, fingerprint = random.choice(self.proxy_clients)
-        
-        headers = fingerprint.get_headers()
-        data = fingerprint.get_request_data(username)
+        """Check if username is available using Web API."""
+        client, proxy_url = random.choice(self.proxy_clients)
         
         try:
+            # Get or reuse CSRF token
+            if proxy_url not in self.csrf_tokens:
+                self.csrf_tokens[proxy_url] = await self._get_csrf_token(client)
+            
+            csrf_token = self.csrf_tokens[proxy_url]
+            
+            headers = self._get_headers(csrf_token)
+            headers['Cookie'] = f'csrftoken={csrf_token}; ig_did={uuid4()}; mid={hashlib.md5(str(uuid4()).encode()).hexdigest()[:26]}'
+            
+            data = {
+                'email': f'{username}_{random.randint(1000,9999)}@gmail.com',
+                'username': username,
+                'first_name': '',
+                'opt_into_one_tap': 'false',
+            }
+            
             response = await client.post(
-                CONFIG["INSTAGRAM_API_URL"], 
-                headers=headers, 
+                CONFIG["CHECK_USERNAME_URL"],
+                headers=headers,
                 data=data
             )
+            
             response_text = response.text
             self.stats["total_requests"] += 1
             
-            # Debug: print first response
-            if self.stats["total_requests"] == 1:
+            if self.stats["total_requests"] <= 3:
                 self.stats["sample_response"] = response_text[:500]
             
-            # Check for various error indicators
-            if '"spam"' in response_text:
-                self.stats["spam_errors"] += 1
-                return False, response_text, "spam"
-            
-            if 'rate_limit' in response_text.lower():
-                self.stats["rate_limits"] += 1
-                return False, response_text, "rate_limit"
-            
-            if 'challenge_required' in response_text:
-                self.stats["challenges"] += 1
-                return False, response_text, "challenge"
-            
-            # Username is AVAILABLE if email_is_taken appears
-            # (means the username passed validation, only email is the issue)
-            if '"email_is_taken"' in response_text:
-                self.stats["available_found"] += 1
-                return True, response_text, None
-            
-            # Username is TAKEN if username_is_taken appears
-            if '"username_is_taken"' in response_text or 'username' in response_text.lower():
+            # Check responses
+            if 'username_is_taken' in response_text or '"username":' in response_text:
                 self.stats["username_taken"] += 1
                 return False, response_text, "taken"
             
-            # Other responses
+            if '"errors"' in response_text and 'username' not in response_text.lower():
+                # Error but not about username = username is available!
+                self.stats["available_found"] += 1
+                return True, response_text, None
+            
+            if 'email_is_taken' in response_text:
+                # Email error means username was accepted
+                self.stats["available_found"] += 1
+                return True, response_text, None
+            
+            if '"spam"' in response_text or 'spam' in response_text.lower():
+                self.stats["spam_errors"] += 1
+                # Refresh CSRF token
+                del self.csrf_tokens[proxy_url]
+                return False, response_text, "spam"
+            
+            if 'rate' in response_text.lower() or 'limit' in response_text.lower():
+                self.stats["rate_limits"] += 1
+                del self.csrf_tokens[proxy_url]
+                return False, response_text, "rate_limit"
+            
+            if 'challenge' in response_text.lower():
+                self.stats["challenges"] += 1
+                return False, response_text, "challenge"
+            
+            # Check for successful account creation attempt blocked only by email
+            if 'dryrun_passed' in response_text or '"status":"ok"' in response_text:
+                self.stats["available_found"] += 1
+                return True, response_text, None
+            
             self.stats["other_responses"] += 1
             return False, response_text, "other"
             
@@ -444,11 +359,11 @@ class AutoInstagramChecker:
             return False, "", "timeout"
         except httpx.RequestError as e:
             self.stats["connection_errors"] += 1
-            self.stats["last_error"] = str(e)[:100]
+            self.stats["last_error"] = str(e)[:200]
             return False, "", "connection_error"
         except Exception as e:
             self.stats["other_errors"] += 1
-            self.stats["last_error"] = str(e)[:100]
+            self.stats["last_error"] = str(e)[:200]
             return False, "", "error"
 
 
@@ -463,7 +378,6 @@ class SearchSession:
         self.max_concurrency = CONFIG["MAX_CONCURRENCY"]
         self.start_time = 0
         
-        # Statistics for debugging
         self.stats = {
             "total_requests": 0,
             "available_found": 0,
@@ -498,7 +412,7 @@ class SearchSession:
                 self.should_stop = True
                 return
             
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.02)
 
     async def run(self):
         self.start_time = time.time()
@@ -506,10 +420,13 @@ class SearchSession:
         proxy_clients = []
         for proxy_url in PROXIES_LIST:
             try:
-                fingerprint = proxy_manager.get_fingerprint(proxy_url)
-                client = httpx.AsyncClient(proxy=proxy_url, timeout=5.0)
-                proxy_clients.append((client, proxy_url, fingerprint))
-            except Exception as e:
+                client = httpx.AsyncClient(
+                    proxy=proxy_url, 
+                    timeout=8.0,
+                    follow_redirects=True
+                )
+                proxy_clients.append((client, proxy_url))
+            except Exception:
                 pass
         
         if not proxy_clients:
@@ -521,7 +438,7 @@ class SearchSession:
                 "stats": self.stats
             }
 
-        checker = AutoInstagramChecker(proxy_clients, self.stats)
+        checker = WebInstagramChecker(proxy_clients, self.stats)
         
         tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
         
@@ -538,7 +455,7 @@ class SearchSession:
         self.should_stop = True
         await asyncio.gather(*tasks, return_exceptions=True)
         
-        for client, _, _ in proxy_clients:
+        for client, _ in proxy_clients:
             await client.aclose()
             
         return {
@@ -558,7 +475,7 @@ class SearchSession:
 def home():
     return jsonify({
         "status": "online",
-        "message": "Instagram Checker API - Debug Edition",
+        "message": "Instagram Checker API - Web Edition",
         "usage": "Send GET request to /search to find a user.",
         "proxies_count": len(PROXIES_LIST)
     })
