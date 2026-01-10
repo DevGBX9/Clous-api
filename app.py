@@ -35,6 +35,14 @@ sys.dont_write_bytecode = True
 # ==========================================
 #              CONFIGURATION
 # ==========================================
+import threading
+from generate_ua import generate_agents
+
+# ... (Previous imports remain, ensuring we have what we need)
+
+# ==========================================
+#              CONFIGURATION
+# ==========================================
 CONFIG = {
     "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
     "TIMEOUT_SECONDS": 30,
@@ -148,17 +156,35 @@ PROXIES_LIST = [
 # We use random.choice mostly, but cycle can be used for round-robin
 proxy_pool = itertools.cycle(PROXIES_LIST)
 
-# Expanded User Agents
-# Load User Agents from external file
-try:
-    with open('user_agents.json', 'r') as f:
-        USER_AGENTS = json.load(f)
-except FileNotFoundError:
-    print("Error: user_agents.json not found! Please run generate_ua.py first.")
-    # Fallback to a small list if file is missing (just in case)
-    USER_AGENTS = [
-        'Instagram 100.0.0.17.129 Android (28/9.0; 480dpi; 1080x2240; Xiaomi; MI 8; dipper; qcom; en_US)',
-    ]
+# ----------------------------------------------------
+# DYNAMIC USER-AGENT GENERATION (MEMORY-ONLY)
+# ----------------------------------------------------
+# Initialize with 1000 generated agents
+print("Initializing 1000 Legacy User-Agents...")
+USER_AGENTS = generate_agents(1000)
+
+def auto_refresh_user_agents():
+    """
+    Background task to refresh User-Agents every 60 seconds.
+    Runs silently in a daemon thread.
+    """
+    global USER_AGENTS
+    while True:
+        try:
+            time.sleep(60) # Wait 1 minute
+            # Generate new batch
+            new_agents = generate_agents(1000)
+            if new_agents:
+                USER_AGENTS = new_agents
+                # Optional: print debug info to logs (visible in Railway logs)
+                # print(f"[Auto-Refresh] Updated {len(USER_AGENTS)} User-Agents.")
+        except Exception as e:
+            print(f"[Auto-Refresh Error] {e}")
+            time.sleep(60) # Retry after minute
+
+# Start the background thread immediately
+threading.Thread(target=auto_refresh_user_agents, daemon=True).start()
+
 
 HEADERS_TEMPLATE = {
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
