@@ -214,7 +214,7 @@ def create_secure_client(proxy_url: str) -> httpx.AsyncClient:
     
     client = httpx.AsyncClient(
         transport=transport,
-        timeouts=httpx.Timeout(10.0, connect=5.0),
+        timeout=httpx.Timeout(10.0, connect=5.0),
         trust_env=False, # Ignore system proxies/env vars
         http2=False, # Better for stealth (looks more like standard App requests)
     )
