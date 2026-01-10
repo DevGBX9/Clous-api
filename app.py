@@ -5,8 +5,6 @@ Instagram Username Checker - On-Demand API
 ==========================================
 
 Uses Instagram Web API for reliable username checking.
-Fetches proxies dynamically from Firebase Realtime Database.
-Prioritizes stable_proxies over regular proxies.
 """
 
 import os
@@ -26,16 +24,10 @@ sys.dont_write_bytecode = True
 #              CONFIGURATION
 # ==========================================
 CONFIG = {
+    # Web API endpoint - more reliable
     "CHECK_USERNAME_URL": "https://www.instagram.com/api/v1/web/accounts/web_create_ajax/attempt/",
     "TIMEOUT_SECONDS": 30,
     "MAX_CONCURRENCY": 30,
-    
-    # Firebase Database URLs
-    "FIREBASE_STABLE_PROXIES": "https://clous-proxys-qpi-default-rtdb.firebaseio.com/stable_proxies.json",
-    "FIREBASE_PROXIES": "https://clous-proxys-qpi-default-rtdb.firebaseio.com/proxies.json",
-    
-    # Proxy cache settings
-    "PROXY_CACHE_TTL": 60,  # Refresh proxies every 60 seconds
 }
 
 CHARS = {
@@ -45,7 +37,101 @@ CHARS = {
 }
 CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
-# Web User Agents
+# Rotating Proxies
+PROXIES_LIST = [
+    "http://mpdmbsys:r36zb0uyv1ls@142.111.48.253:7030",
+    "http://mpdmbsys:r36zb0uyv1ls@23.95.150.145:6114",
+    "http://mpdmbsys:r36zb0uyv1ls@198.23.239.134:6540",
+    "http://mpdmbsys:r36zb0uyv1ls@107.172.163.27:6543",
+    "http://mpdmbsys:r36zb0uyv1ls@198.105.121.200:6462",
+    "http://mpdmbsys:r36zb0uyv1ls@64.137.96.74:6641",
+    "http://mpdmbsys:r36zb0uyv1ls@84.247.60.125:6095",
+    "http://mpdmbsys:r36zb0uyv1ls@216.10.27.159:6837",
+    "http://mpdmbsys:r36zb0uyv1ls@23.26.71.145:5628",
+    "http://mpdmbsys:r36zb0uyv1ls@23.27.208.120:5830",
+    "http://wjeirsdr:jw66naw4tr9i@142.111.48.253:7030",
+    "http://wjeirsdr:jw66naw4tr9i@23.95.150.145:6114",
+    "http://wjeirsdr:jw66naw4tr9i@198.23.239.134:6540",
+    "http://wjeirsdr:jw66naw4tr9i@107.172.163.27:6543",
+    "http://wjeirsdr:jw66naw4tr9i@198.105.121.200:6462",
+    "http://wjeirsdr:jw66naw4tr9i@64.137.96.74:6641",
+    "http://wjeirsdr:jw66naw4tr9i@84.247.60.125:6095",
+    "http://wjeirsdr:jw66naw4tr9i@216.10.27.159:6837",
+    "http://wjeirsdr:jw66naw4tr9i@23.26.71.145:5628",
+    "http://wjeirsdr:jw66naw4tr9i@23.27.208.120:5830",
+    "http://yfryygud:8o2xjhpyq9xj@142.111.48.253:7030",
+    "http://yfryygud:8o2xjhpyq9xj@23.95.150.145:6114",
+    "http://yfryygud:8o2xjhpyq9xj@198.23.239.134:6540",
+    "http://yfryygud:8o2xjhpyq9xj@107.172.163.27:6543",
+    "http://yfryygud:8o2xjhpyq9xj@198.105.121.200:6462",
+    "http://yfryygud:8o2xjhpyq9xj@64.137.96.74:6641",
+    "http://yfryygud:8o2xjhpyq9xj@84.247.60.125:6095",
+    "http://yfryygud:8o2xjhpyq9xj@216.10.27.159:6837",
+    "http://yfryygud:8o2xjhpyq9xj@23.26.71.145:5628",
+    "http://yfryygud:8o2xjhpyq9xj@23.27.208.120:5830",
+    "http://axjoyxsu:nkeue7p68pag@142.111.48.253:7030",
+    "http://axjoyxsu:nkeue7p68pag@23.95.150.145:6114",
+    "http://axjoyxsu:nkeue7p68pag@198.23.239.134:6540",
+    "http://axjoyxsu:nkeue7p68pag@107.172.163.27:6543",
+    "http://axjoyxsu:nkeue7p68pag@198.105.121.200:6462",
+    "http://axjoyxsu:nkeue7p68pag@64.137.96.74:6641",
+    "http://axjoyxsu:nkeue7p68pag@84.247.60.125:6095",
+    "http://axjoyxsu:nkeue7p68pag@216.10.27.159:6837",
+    "http://axjoyxsu:nkeue7p68pag@23.26.71.145:5628",
+    "http://axjoyxsu:nkeue7p68pag@23.27.208.120:5830",
+    "http://rxfjeodt:tjf4ikwjokhr@142.111.48.253:7030",
+    "http://rxfjeodt:tjf4ikwjokhr@23.95.150.145:6114",
+    "http://rxfjeodt:tjf4ikwjokhr@198.23.239.134:6540",
+    "http://rxfjeodt:tjf4ikwjokhr@107.172.163.27:6543",
+    "http://rxfjeodt:tjf4ikwjokhr@198.105.121.200:6462",
+    "http://rxfjeodt:tjf4ikwjokhr@64.137.96.74:6641",
+    "http://rxfjeodt:tjf4ikwjokhr@84.247.60.125:6095",
+    "http://rxfjeodt:tjf4ikwjokhr@216.10.27.159:6837",
+    "http://rxfjeodt:tjf4ikwjokhr@23.26.71.145:5628",
+    "http://rxfjeodt:tjf4ikwjokhr@23.27.208.120:5830",
+    "http://egfosers:kf2wh571ar1z@142.111.48.253:7030",
+    "http://egfosers:kf2wh571ar1z@23.95.150.145:6114",
+    "http://egfosers:kf2wh571ar1z@198.23.239.134:6540",
+    "http://egfosers:kf2wh571ar1z@107.172.163.27:6543",
+    "http://egfosers:kf2wh571ar1z@198.105.121.200:6462",
+    "http://egfosers:kf2wh571ar1z@64.137.96.74:6641",
+    "http://egfosers:kf2wh571ar1z@84.247.60.125:6095",
+    "http://egfosers:kf2wh571ar1z@216.10.27.159:6837",
+    "http://egfosers:kf2wh571ar1z@23.26.71.145:5628",
+    "http://egfosers:kf2wh571ar1z@23.27.208.120:5830",
+    "http://kgghxbly:csswtnznqrey@142.111.48.253:7030",
+    "http://kgghxbly:csswtnznqrey@23.95.150.145:6114",
+    "http://kgghxbly:csswtnznqrey@198.23.239.134:6540",
+    "http://kgghxbly:csswtnznqrey@107.172.163.27:6543",
+    "http://kgghxbly:csswtnznqrey@198.105.121.200:6462",
+    "http://kgghxbly:csswtnznqrey@64.137.96.74:6641",
+    "http://kgghxbly:csswtnznqrey@84.247.60.125:6095",
+    "http://kgghxbly:csswtnznqrey@216.10.27.159:6837",
+    "http://kgghxbly:csswtnznqrey@23.26.71.145:5628",
+    "http://kgghxbly:csswtnznqrey@23.27.208.120:5830",
+    "http://lnydwdms:n7c0x0qtyrvp@142.111.48.253:7030",
+    "http://lnydwdms:n7c0x0qtyrvp@23.95.150.145:6114",
+    "http://lnydwdms:n7c0x0qtyrvp@198.23.239.134:6540",
+    "http://lnydwdms:n7c0x0qtyrvp@107.172.163.27:6543",
+    "http://lnydwdms:n7c0x0qtyrvp@198.105.121.200:6462",
+    "http://lnydwdms:n7c0x0qtyrvp@64.137.96.74:6641",
+    "http://lnydwdms:n7c0x0qtyrvp@84.247.60.125:6095",
+    "http://lnydwdms:n7c0x0qtyrvp@216.10.27.159:6837",
+    "http://lnydwdms:n7c0x0qtyrvp@23.26.71.145:5628",
+    "http://lnydwdms:n7c0x0qtyrvp@23.27.208.120:5830",
+    "http://idzfeaih:tg11yrege1lz@142.111.48.253:7030",
+    "http://idzfeaih:tg11yrege1lz@23.95.150.145:6114",
+    "http://idzfeaih:tg11yrege1lz@198.23.239.134:6540",
+    "http://idzfeaih:tg11yrege1lz@107.172.163.27:6543",
+    "http://idzfeaih:tg11yrege1lz@198.105.121.200:6462",
+    "http://idzfeaih:tg11yrege1lz@64.137.96.74:6641",
+    "http://idzfeaih:tg11yrege1lz@84.247.60.125:6095",
+    "http://idzfeaih:tg11yrege1lz@216.10.27.159:6837",
+    "http://idzfeaih:tg11yrege1lz@23.26.71.145:5628",
+    "http://idzfeaih:tg11yrege1lz@23.27.208.120:5830",
+]
+
+# Web User Agents (Chrome on Android)
 WEB_USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
     "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
@@ -54,100 +140,6 @@ WEB_USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 ]
-
-
-# ==========================================
-#         FIREBASE PROXY MANAGER
-# ==========================================
-
-class FirebaseProxyManager:
-    """
-    Manages proxy fetching from Firebase Realtime Database.
-    Prioritizes stable_proxies over regular proxies.
-    """
-    
-    def __init__(self):
-        self.proxies = []
-        self.stable_proxies = []
-        self.last_fetch = 0
-        self.fetch_lock = asyncio.Lock()
-    
-    async def fetch_proxies(self):
-        """Fetch proxies from Firebase, with caching."""
-        current_time = time.time()
-        
-        # Check if cache is still valid
-        if self.proxies and (current_time - self.last_fetch) < CONFIG["PROXY_CACHE_TTL"]:
-            return self._get_prioritized_list()
-        
-        async with self.fetch_lock:
-            # Double-check after acquiring lock
-            if self.proxies and (current_time - self.last_fetch) < CONFIG["PROXY_CACHE_TTL"]:
-                return self._get_prioritized_list()
-            
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    # Fetch stable_proxies first (priority)
-                    stable_response = await client.get(CONFIG["FIREBASE_STABLE_PROXIES"])
-                    stable_data = stable_response.json() if stable_response.status_code == 200 else None
-                    
-                    # Fetch regular proxies
-                    proxies_response = await client.get(CONFIG["FIREBASE_PROXIES"])
-                    proxies_data = proxies_response.json() if proxies_response.status_code == 200 else None
-                    
-                    # Extract addresses
-                    self.stable_proxies = []
-                    self.proxies = []
-                    
-                    if stable_data:
-                        for key, value in stable_data.items():
-                            if isinstance(value, dict) and 'address' in value:
-                                self.stable_proxies.append(value['address'])
-                    
-                    if proxies_data:
-                        for key, value in proxies_data.items():
-                            if isinstance(value, dict) and 'address' in value:
-                                # Don't add duplicates that are already in stable
-                                if value['address'] not in self.stable_proxies:
-                                    self.proxies.append(value['address'])
-                    
-                    self.last_fetch = current_time
-                    
-                    print(f"[Firebase] Loaded {len(self.stable_proxies)} stable + {len(self.proxies)} regular proxies")
-                    
-            except Exception as e:
-                print(f"[Firebase] Error fetching proxies: {e}")
-                # Keep using old proxies if fetch fails
-        
-        return self._get_prioritized_list()
-    
-    def _get_prioritized_list(self):
-        """
-        Returns a prioritized list of proxies.
-        stable_proxies appear 3x more often to increase their usage.
-        """
-        prioritized = []
-        
-        # Add stable proxies 3 times (3x priority)
-        prioritized.extend(self.stable_proxies * 3)
-        
-        # Add regular proxies once
-        prioritized.extend(self.proxies)
-        
-        return prioritized
-    
-    def get_stats(self):
-        """Get current proxy stats."""
-        return {
-            "stable_count": len(self.stable_proxies),
-            "regular_count": len(self.proxies),
-            "total_unique": len(self.stable_proxies) + len(self.proxies),
-            "last_fetch": self.last_fetch,
-        }
-
-
-# Global proxy manager
-proxy_manager = FirebaseProxyManager()
 
 
 # ==========================================
@@ -271,11 +263,13 @@ class WebInstagramChecker:
                 }
             )
             
+            # Extract csrf token from cookies
             cookies = response.cookies
             csrf = cookies.get('csrftoken', '')
             if csrf:
                 return csrf
             
+            # Try to extract from response
             text = response.text
             if 'csrf_token' in text:
                 import re
@@ -283,6 +277,7 @@ class WebInstagramChecker:
                 if match:
                     return match.group(1)
             
+            # Generate a random one as fallback
             return hashlib.md5(str(uuid4()).encode()).hexdigest()[:32]
             
         except Exception:
@@ -290,9 +285,10 @@ class WebInstagramChecker:
     
     async def check_username_availability(self, username: str):
         """Check if username is available using Web API."""
-        client, proxy_url, is_stable = random.choice(self.proxy_clients)
+        client, proxy_url = random.choice(self.proxy_clients)
         
         try:
+            # Get or reuse CSRF token
             if proxy_url not in self.csrf_tokens:
                 self.csrf_tokens[proxy_url] = await self._get_csrf_token(client)
             
@@ -317,40 +313,40 @@ class WebInstagramChecker:
             response_text = response.text
             self.stats["total_requests"] += 1
             
-            if is_stable:
-                self.stats["stable_proxy_requests"] += 1
-            
             if self.stats["total_requests"] <= 3:
                 self.stats["sample_response"] = response_text[:500]
             
+            # Check responses
             if 'username_is_taken' in response_text or '"username":' in response_text:
                 self.stats["username_taken"] += 1
                 return False, response_text, "taken"
             
             if '"errors"' in response_text and 'username' not in response_text.lower():
+                # Error but not about username = username is available!
                 self.stats["available_found"] += 1
                 return True, response_text, None
             
             if 'email_is_taken' in response_text:
+                # Email error means username was accepted
                 self.stats["available_found"] += 1
                 return True, response_text, None
             
             if '"spam"' in response_text or 'spam' in response_text.lower():
                 self.stats["spam_errors"] += 1
-                if proxy_url in self.csrf_tokens:
-                    del self.csrf_tokens[proxy_url]
+                # Refresh CSRF token
+                del self.csrf_tokens[proxy_url]
                 return False, response_text, "spam"
             
             if 'rate' in response_text.lower() or 'limit' in response_text.lower():
                 self.stats["rate_limits"] += 1
-                if proxy_url in self.csrf_tokens:
-                    del self.csrf_tokens[proxy_url]
+                del self.csrf_tokens[proxy_url]
                 return False, response_text, "rate_limit"
             
             if 'challenge' in response_text.lower():
                 self.stats["challenges"] += 1
                 return False, response_text, "challenge"
             
+            # Check for successful account creation attempt blocked only by email
             if 'dryrun_passed' in response_text or '"status":"ok"' in response_text:
                 self.stats["available_found"] += 1
                 return True, response_text, None
@@ -395,8 +391,6 @@ class SearchSession:
             "other_errors": 0,
             "sample_response": "",
             "last_error": "",
-            "stable_proxy_requests": 0,
-            "proxies_from_firebase": 0,
         }
 
     async def _worker(self, checker):
@@ -423,40 +417,15 @@ class SearchSession:
     async def run(self):
         self.start_time = time.time()
         
-        # Fetch proxies from Firebase
-        proxy_addresses = await proxy_manager.fetch_proxies()
-        
-        if not proxy_addresses:
-            return {
-                "status": "failed",
-                "username": None,
-                "reason": "no_proxies_in_database",
-                "duration": 0,
-                "stats": self.stats
-            }
-        
-        # Get proxy stats
-        proxy_stats = proxy_manager.get_stats()
-        self.stats["proxies_from_firebase"] = proxy_stats["total_unique"]
-        self.stats["stable_proxies_count"] = proxy_stats["stable_count"]
-        self.stats["regular_proxies_count"] = proxy_stats["regular_count"]
-        
-        # Create clients for unique proxies
-        unique_proxies = list(set(proxy_addresses))
         proxy_clients = []
-        
-        for proxy_addr in unique_proxies:
+        for proxy_url in PROXIES_LIST:
             try:
-                # Format: IP:PORT -> http://IP:PORT
-                proxy_url = f"http://{proxy_addr}"
-                is_stable = proxy_addr in proxy_manager.stable_proxies
-                
                 client = httpx.AsyncClient(
                     proxy=proxy_url, 
                     timeout=8.0,
                     follow_redirects=True
                 )
-                proxy_clients.append((client, proxy_url, is_stable))
+                proxy_clients.append((client, proxy_url))
             except Exception:
                 pass
         
@@ -464,7 +433,7 @@ class SearchSession:
             return {
                 "status": "failed",
                 "username": None,
-                "reason": "no_working_proxies",
+                "reason": "no_proxies_available",
                 "duration": 0,
                 "stats": self.stats
             }
@@ -486,7 +455,7 @@ class SearchSession:
         self.should_stop = True
         await asyncio.gather(*tasks, return_exceptions=True)
         
-        for client, _, _ in proxy_clients:
+        for client, _ in proxy_clients:
             await client.aclose()
             
         return {
@@ -504,17 +473,11 @@ class SearchSession:
 
 @app.route('/')
 def home():
-    stats = proxy_manager.get_stats()
     return jsonify({
         "status": "online",
-        "message": "Instagram Checker API - Firebase Proxies Edition",
+        "message": "Instagram Checker API - Web Edition",
         "usage": "Send GET request to /search to find a user.",
-        "proxy_source": "Firebase Realtime Database",
-        "proxies": {
-            "stable": stats["stable_count"],
-            "regular": stats["regular_count"],
-            "total": stats["total_unique"],
-        }
+        "proxies_count": len(PROXIES_LIST)
     })
 
 @app.route('/search')
@@ -522,16 +485,6 @@ async def search():
     session = SearchSession()
     result = await session.run()
     return jsonify(result)
-
-@app.route('/proxies')
-async def get_proxies():
-    """Endpoint to check current proxies from Firebase."""
-    await proxy_manager.fetch_proxies()
-    return jsonify({
-        "stable_proxies": proxy_manager.stable_proxies,
-        "regular_proxies": proxy_manager.proxies,
-        "stats": proxy_manager.get_stats()
-    })
 
 
 if __name__ == "__main__":
