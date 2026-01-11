@@ -363,7 +363,21 @@ class AutoInstagramChecker:
     def __init__(self, identity_pool: IdentityPool):
         self.identity_pool = identity_pool
         self.clients: Dict[str, httpx.AsyncClient] = {}
-        self.logged_samples: int = 0  # Track how many sample responses we've logged
+        
+        # Detailed statistics for debugging
+        self.stats = {
+            "total_requests": 0,
+            "successful_responses": 0,
+            "timeout_errors": 0,
+            "connection_errors": 0,
+            "rate_limits": 0,
+            "username_taken": 0,
+            "username_available": 0,
+            "other_errors": 0,
+            "empty_responses": 0,
+        }
+        self.sample_responses: List[str] = []  # Store first 10 unique response types
+        self.seen_response_patterns: set = set()
     
     async def _get_client(self, proxy_url: str) -> httpx.AsyncClient:
         """Get or create async client for proxy."""
@@ -374,10 +388,49 @@ class AutoInstagramChecker:
             )
         return self.clients[proxy_url]
     
+    def _categorize_response(self, response_text: str) -> str:
+        """Categorize response for statistics."""
+        if not response_text:
+            return "empty"
+        if '"spam"' in response_text:
+            return "spam"
+        if 'rate_limit' in response_text:
+            return "rate_limit"
+        if '"challenge_required"' in response_text:
+            return "challenge"
+        if '"username_is_taken"' in response_text:
+            return "username_taken"
+        if '"username":["' in response_text:
+            return "username_error"
+        if '"email_is_taken"' in response_text:
+            return "email_taken_username_available"
+        if '"errors"' in response_text:
+            return "other_error"
+        if '"status":"ok"' in response_text:
+            return "success"
+        return "unknown"
+    
+    def _log_sample_response(self, username: str, response_text: str, category: str):
+        """Log unique response patterns for debugging."""
+        # Create a pattern key (first 100 chars + category)
+        pattern_key = f"{category}:{response_text[:100] if response_text else 'empty'}"
+        
+        if pattern_key not in self.seen_response_patterns and len(self.sample_responses) < 10:
+            self.seen_response_patterns.add(pattern_key)
+            self.sample_responses.append({
+                "username": username,
+                "category": category,
+                "response": response_text[:500] if response_text else "EMPTY",
+            })
+            logger.info(f"📝 NEW RESPONSE TYPE [{category}] for '{username}':")
+            logger.info(f"   {response_text[:400] if response_text else 'EMPTY RESPONSE'}...")
+    
     async def check_username_availability(self, username: str) -> Tuple[bool, str, Optional[str]]:
         """Check username availability using smart identity rotation."""
         proxy_identity = self.identity_pool.get_random_proxy_identity()
         identity = proxy_identity.get_identity()
+        
+        self.stats["total_requests"] += 1
         
         try:
             client = await self._get_client(proxy_identity.proxy_url)
@@ -391,37 +444,54 @@ class AutoInstagramChecker:
             )
             response_text = response.text
             
-            # Log sample responses for debugging (first few only)
-            if self.logged_samples < 5:
-                self.logged_samples += 1
-                logger.info(f"📝 Sample response for '{username}': {response_text[:300]}...")
+            self.stats["successful_responses"] += 1
+            
+            # Categorize and log
+            category = self._categorize_response(response_text)
+            self._log_sample_response(username, response_text, category)
+            
+            # Handle empty response
+            if not response_text:
+                self.stats["empty_responses"] += 1
+                return False, "", "empty_response"
             
             # Check for rate limiting / spam detection
-            if '"spam"' in response_text or 'rate_limit_error' in response_text or '"challenge_required"' in response_text:
-                logger.warning(f"⚠️ Rate limit/Challenge on proxy")
+            if category in ["spam", "rate_limit", "challenge"]:
+                self.stats["rate_limits"] += 1
                 return False, response_text, "rate_limit"
             
-            # Username is AVAILABLE if:
-            # 1. "email_is_taken" appears (username passed, email check failed)
-            # 2. "username" error is NOT present (username is not taken)
-            # 3. Response indicates username passed validation
+            # Check if username is taken
+            if category in ["username_taken", "username_error"]:
+                self.stats["username_taken"] += 1
+                return False, response_text, None
             
-            username_is_taken = '"username_is_taken"' in response_text or '"username":["' in response_text
-            email_is_taken = '"email_is_taken"' in response_text
+            # Username is available if email_is_taken (means username passed!)
+            if category == "email_taken_username_available":
+                self.stats["username_available"] += 1
+                logger.info(f"✅✅✅ FOUND AVAILABLE USERNAME: {username}")
+                return True, response_text, None
             
-            # If username is not taken, it's available!
-            is_available = email_is_taken or (not username_is_taken and '"errors"' in response_text)
-            
-            if is_available:
-                logger.info(f"✅ Found available username: {username}")
-                logger.info(f"📄 Response: {response_text[:500]}")
-            
-            return is_available, response_text, None
+            # Other cases
+            self.stats["other_errors"] += 1
+            return False, response_text, None
             
         except httpx.TimeoutException:
+            self.stats["timeout_errors"] += 1
             return False, "", "timeout"
-        except httpx.RequestError:
+        except httpx.RequestError as e:
+            self.stats["connection_errors"] += 1
+            # Log first few connection errors
+            if self.stats["connection_errors"] <= 3:
+                logger.warning(f"🔌 Connection error: {type(e).__name__}: {str(e)[:100]}")
             return False, "", "connection_error"
+    
+    def get_detailed_stats(self) -> Dict[str, Any]:
+        """Get comprehensive statistics."""
+        return {
+            "requests": self.stats,
+            "sample_responses": self.sample_responses,
+            "unique_response_types": len(self.seen_response_patterns),
+        }
     
     async def close_all(self) -> None:
         """Close all HTTP clients."""
@@ -509,21 +579,37 @@ class SearchSession:
             await asyncio.gather(*tasks, return_exceptions=True)
             
         finally:
+            # Get detailed stats before closing
+            detailed_stats = checker.get_detailed_stats()
             await checker.close_all()
         
         duration = round(time.time() - self.start_time, 2)
-        stats = identity_pool.get_stats()
+        
+        # Log detailed statistics
+        logger.info("=" * 60)
+        logger.info("📊 DETAILED STATISTICS:")
+        logger.info(f"   Total Requests: {detailed_stats['requests']['total_requests']}")
+        logger.info(f"   Successful Responses: {detailed_stats['requests']['successful_responses']}")
+        logger.info(f"   Timeout Errors: {detailed_stats['requests']['timeout_errors']}")
+        logger.info(f"   Connection Errors: {detailed_stats['requests']['connection_errors']}")
+        logger.info(f"   Rate Limits: {detailed_stats['requests']['rate_limits']}")
+        logger.info(f"   Username Taken: {detailed_stats['requests']['username_taken']}")
+        logger.info(f"   Username Available: {detailed_stats['requests']['username_available']}")
+        logger.info(f"   Other Errors: {detailed_stats['requests']['other_errors']}")
+        logger.info(f"   Unique Response Types: {detailed_stats['unique_response_types']}")
+        logger.info("=" * 60)
         
         result = {
             "status": "success" if self.found_username else "failed",
             "username": self.found_username,
             "reason": self.result_reason if not self.found_username else None,
             "duration": duration,
-            "stats": stats
+            "detailed_stats": detailed_stats["requests"],
+            "sample_responses": detailed_stats["sample_responses"][:5],  # First 5 samples in response
         }
         
-        logger.info(f"Search completed: {result}")
-        logger.info("=" * 50)
+        logger.info(f"Search completed: status={result['status']}, duration={duration}s")
+        logger.info("=" * 60)
         return result
 
 
