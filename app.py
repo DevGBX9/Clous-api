@@ -21,11 +21,10 @@ import os
 import sys
 import time
 import random
-import threading
-import requests
+import asyncio
+import httpx
 import itertools
 from uuid import uuid4
-from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify
 from flask_cors import CORS
 
@@ -39,7 +38,7 @@ CONFIG = {
     "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
     "TIMEOUT_SECONDS": 30,
     "FIXED_EMAIL": "abdo1@gmail.com",
-    "MAX_THREADS_CAP": 50,  # Cap threads to prevent server overload
+    "MAX_CONCURRENCY": 100,  # Increased for async
 }
 
 # Values for username generation
@@ -52,7 +51,96 @@ CHARS["ALL_VALID"] = CHARS["LETTERS"] + CHARS["DIGITS"]
 
 # Rotating Proxies (Format: http://user:pass@ip:port)
 PROXIES_LIST = [
-    "http://101.66.195.43:8085"
+    "http://mpdmbsys:r36zb0uyv1ls@142.111.48.253:7030",
+    "http://mpdmbsys:r36zb0uyv1ls@23.95.150.145:6114",
+    "http://mpdmbsys:r36zb0uyv1ls@198.23.239.134:6540",
+    "http://mpdmbsys:r36zb0uyv1ls@107.172.163.27:6543",
+    "http://mpdmbsys:r36zb0uyv1ls@198.105.121.200:6462",
+    "http://mpdmbsys:r36zb0uyv1ls@64.137.96.74:6641",
+    "http://mpdmbsys:r36zb0uyv1ls@84.247.60.125:6095",
+    "http://mpdmbsys:r36zb0uyv1ls@216.10.27.159:6837",
+    "http://mpdmbsys:r36zb0uyv1ls@23.26.71.145:5628",
+    "http://mpdmbsys:r36zb0uyv1ls@23.27.208.120:5830",
+    "http://wjeirsdr:jw66naw4tr9i@142.111.48.253:7030",
+    "http://wjeirsdr:jw66naw4tr9i@23.95.150.145:6114",
+    "http://wjeirsdr:jw66naw4tr9i@198.23.239.134:6540",
+    "http://wjeirsdr:jw66naw4tr9i@107.172.163.27:6543",
+    "http://wjeirsdr:jw66naw4tr9i@198.105.121.200:6462",
+    "http://wjeirsdr:jw66naw4tr9i@64.137.96.74:6641",
+    "http://wjeirsdr:jw66naw4tr9i@84.247.60.125:6095",
+    "http://wjeirsdr:jw66naw4tr9i@216.10.27.159:6837",
+    "http://wjeirsdr:jw66naw4tr9i@23.26.71.145:5628",
+    "http://wjeirsdr:jw66naw4tr9i@23.27.208.120:5830",
+    "http://yfryygud:8o2xjhpyq9xj@142.111.48.253:7030",
+    "http://yfryygud:8o2xjhpyq9xj@23.95.150.145:6114",
+    "http://yfryygud:8o2xjhpyq9xj@198.23.239.134:6540",
+    "http://yfryygud:8o2xjhpyq9xj@107.172.163.27:6543",
+    "http://yfryygud:8o2xjhpyq9xj@198.105.121.200:6462",
+    "http://yfryygud:8o2xjhpyq9xj@64.137.96.74:6641",
+    "http://yfryygud:8o2xjhpyq9xj@84.247.60.125:6095",
+    "http://yfryygud:8o2xjhpyq9xj@216.10.27.159:6837",
+    "http://yfryygud:8o2xjhpyq9xj@23.26.71.145:5628",
+    "http://yfryygud:8o2xjhpyq9xj@23.27.208.120:5830",
+    "http://axjoyxsu:nkeue7p68pag@142.111.48.253:7030",
+    "http://axjoyxsu:nkeue7p68pag@23.95.150.145:6114",
+    "http://axjoyxsu:nkeue7p68pag@198.23.239.134:6540",
+    "http://axjoyxsu:nkeue7p68pag@107.172.163.27:6543",
+    "http://axjoyxsu:nkeue7p68pag@198.105.121.200:6462",
+    "http://axjoyxsu:nkeue7p68pag@64.137.96.74:6641",
+    "http://axjoyxsu:nkeue7p68pag@84.247.60.125:6095",
+    "http://axjoyxsu:nkeue7p68pag@216.10.27.159:6837",
+    "http://axjoyxsu:nkeue7p68pag@23.26.71.145:5628",
+    "http://axjoyxsu:nkeue7p68pag@23.27.208.120:5830",
+    "http://rxfjeodt:tjf4ikwjokhr@142.111.48.253:7030",
+    "http://rxfjeodt:tjf4ikwjokhr@23.95.150.145:6114",
+    "http://rxfjeodt:tjf4ikwjokhr@198.23.239.134:6540",
+    "http://rxfjeodt:tjf4ikwjokhr@107.172.163.27:6543",
+    "http://rxfjeodt:tjf4ikwjokhr@198.105.121.200:6462",
+    "http://rxfjeodt:tjf4ikwjokhr@64.137.96.74:6641",
+    "http://rxfjeodt:tjf4ikwjokhr@84.247.60.125:6095",
+    "http://rxfjeodt:tjf4ikwjokhr@216.10.27.159:6837",
+    "http://rxfjeodt:tjf4ikwjokhr@23.26.71.145:5628",
+    "http://rxfjeodt:tjf4ikwjokhr@23.27.208.120:5830",
+    "http://egfosers:kf2wh571ar1z@142.111.48.253:7030",
+    "http://egfosers:kf2wh571ar1z@23.95.150.145:6114",
+    "http://egfosers:kf2wh571ar1z@198.23.239.134:6540",
+    "http://egfosers:kf2wh571ar1z@107.172.163.27:6543",
+    "http://egfosers:kf2wh571ar1z@198.105.121.200:6462",
+    "http://egfosers:kf2wh571ar1z@64.137.96.74:6641",
+    "http://egfosers:kf2wh571ar1z@84.247.60.125:6095",
+    "http://egfosers:kf2wh571ar1z@216.10.27.159:6837",
+    "http://egfosers:kf2wh571ar1z@23.26.71.145:5628",
+    "http://egfosers:kf2wh571ar1z@23.27.208.120:5830",
+    "http://kgghxbly:csswtnznqrey@142.111.48.253:7030",
+    "http://kgghxbly:csswtnznqrey@23.95.150.145:6114",
+    "http://kgghxbly:csswtnznqrey@198.23.239.134:6540",
+    "http://kgghxbly:csswtnznqrey@107.172.163.27:6543",
+    "http://kgghxbly:csswtnznqrey@198.105.121.200:6462",
+    "http://kgghxbly:csswtnznqrey@64.137.96.74:6641",
+    "http://kgghxbly:csswtnznqrey@84.247.60.125:6095",
+    "http://kgghxbly:csswtnznqrey@216.10.27.159:6837",
+    "http://kgghxbly:csswtnznqrey@23.26.71.145:5628",
+    "http://kgghxbly:csswtnznqrey@23.27.208.120:5830",
+    "http://lnydwdms:n7c0x0qtyrvp@142.111.48.253:7030",
+    "http://lnydwdms:n7c0x0qtyrvp@23.95.150.145:6114",
+    "http://lnydwdms:n7c0x0qtyrvp@198.23.239.134:6540",
+    "http://lnydwdms:n7c0x0qtyrvp@107.172.163.27:6543",
+    "http://lnydwdms:n7c0x0qtyrvp@198.105.121.200:6462",
+    "http://lnydwdms:n7c0x0qtyrvp@64.137.96.74:6641",
+    "http://lnydwdms:n7c0x0qtyrvp@84.247.60.125:6095",
+    "http://lnydwdms:n7c0x0qtyrvp@216.10.27.159:6837",
+    "http://lnydwdms:n7c0x0qtyrvp@23.26.71.145:5628",
+    "http://lnydwdms:n7c0x0qtyrvp@23.27.208.120:5830",
+    "http://idzfeaih:tg11yrege1lz@142.111.48.253:7030",
+    "http://idzfeaih:tg11yrege1lz@23.95.150.145:6114",
+    "http://idzfeaih:tg11yrege1lz@198.23.239.134:6540",
+    "http://idzfeaih:tg11yrege1lz@107.172.163.27:6543",
+    "http://idzfeaih:tg11yrege1lz@198.105.121.200:6462",
+    "http://idzfeaih:tg11yrege1lz@64.137.96.74:6641",
+    "http://idzfeaih:tg11yrege1lz@84.247.60.125:6095",
+    "http://idzfeaih:tg11yrege1lz@216.10.27.159:6837",
+    "http://idzfeaih:tg11yrege1lz@23.26.71.145:5628",
+    "http://idzfeaih:tg11yrege1lz@23.27.208.120:5830",
 ]
 
 # Random iterator to pick proxies efficiently
@@ -143,10 +231,8 @@ class AutoInstagramChecker:
     Handles the HTTP communication with Instagram APIs.
     Uses Rotating Proxies and Random User Agents.
     """
-    def __init__(self):
-        # We generally use a session, but with rotating proxies and identities per request, 
-        # it's often safer to treat each check as a fresh isolated request or rotate session headers.
-        self.session = requests.Session()
+    def __init__(self, clients):
+        self.clients = clients
     
     def _get_random_headers(self):
         """Generates headers with randomized device bandwidth/connection type."""
@@ -157,19 +243,14 @@ class AutoInstagramChecker:
         headers['X-IG-Bandwidth-TotalBytes-B'] = str(random.randint(500000, 5000000))
         headers['X-IG-Bandwidth-TotalTime-MS'] = str(random.randint(50, 500))
         return headers
-    
-    def _get_proxy_dict(self):
-        """Pick a random proxy from the pool."""
-        proxy_url = random.choice(PROXIES_LIST)
-        return {
-            "http": proxy_url,
-            "https": proxy_url
-        }
 
-    def check_username_availability(self, username):
+    async def check_username_availability(self, username):
         """
-        Checks availability of a username using a random proxy.
+        Checks availability of a username using a random proxy client.
         """
+        # Pick a random client from the pool
+        client = random.choice(self.clients)
+
         # Generate Fresh Device IDs for total anonymity
         data = {
             "email": CONFIG["FIXED_EMAIL"],
@@ -180,13 +261,11 @@ class AutoInstagramChecker:
         }
         
         try:
-            # Short timeout (3s) - slightly longer for proxies
-            response = requests.post(
+            # Short timeout (3s)
+            response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"], 
                 headers=self._get_random_headers(), 
-                data=data, 
-                proxies=self._get_proxy_dict(),
-                timeout=3
+                data=data
             )
             response_text = response.text
             
@@ -196,7 +275,7 @@ class AutoInstagramChecker:
             is_available = '"email_is_taken"' in response_text
             return is_available, response_text, None
             
-        except requests.exceptions.RequestException:
+        except (httpx.RequestError, httpx.TimeoutException):
             # Proxy error or timeout is common, treat as not found/skip to keep moving
             return False, "", "connection_error"
 
@@ -207,69 +286,97 @@ class SearchSession:
     """
     def __init__(self):
         self.generator = AutoUsernameGenerator()
-        self.checker = AutoInstagramChecker()
         
         # Result State
         self.found_username = None
         self.result_reason = "timeout" 
         
         # Concurrency Control
-        self.stop_event = threading.Event()
-        self.max_threads = min(CONFIG["MAX_THREADS_CAP"], (os.cpu_count() or 4) * 8)
+        self.should_stop = False
+        self.max_concurrency = CONFIG["MAX_CONCURRENCY"]
         self.start_time = 0
 
-    def _worker(self):
-        """Code running inside each worker thread."""
-        while not self.stop_event.is_set():
+    async def _worker(self, checker):
+        """Code running inside each async worker."""
+        while not self.should_stop:
             # 1. Check Timeout
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
-                self.stop_event.set()
+                self.should_stop = True
                 return
 
             # 2. Generate
             username = self.generator.generate()
             
             # 3. Check
-            is_available, _, error = self.checker.check_username_availability(username)
+            is_available, _, error = await checker.check_username_availability(username)
             
             # 4. Handle Result
-            if self.stop_event.is_set():
+            if self.should_stop:
                 return 
 
             if error == "rate_limit":
-                # With proxies, a single 429 might not mean global stop, 
-                # but if ALL are failing, we might stop. 
-                # For simplicity in this logic: if a proxy is banned, we try another.
-                # We only stop if we suspect a global ban or app-level ban.
-                # But to be safe as per user requirements:
-                # self.result_reason = "rate_limit"
-                # self.stop_event.set()
-                # return
-                pass # Continue with other proxies
+                # With proxies, a single 429 might not mean global stop.
+                # We continue with other proxies.
+                pass 
             
             if is_available:
                 self.found_username = username
                 self.result_reason = "success"
-                self.stop_event.set()
+                self.should_stop = True
                 return
             
-            # Avoid CPU Thrashing
-            time.sleep(0.05)
+            # Minimal yield
+            await asyncio.sleep(0.01)
 
-    def run(self):
-        """Starts the thread pool."""
+    async def run(self):
+        """Starts the async task pool."""
         self.start_time = time.time()
         
-        with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
-            for _ in range(self.max_threads):
-                executor.submit(self._worker)
+        # Initialize clients for each proxy
+        # We assume PROXIES_LIST has valid proxy URLs
+        clients = []
+        for proxy_url in PROXIES_LIST:
+            try:
+                # httpx.AsyncClient manages the connection pool for this proxy
+                client = httpx.AsyncClient(proxy=proxy_url, timeout=3.0)
+                clients.append(client)
+            except Exception:
+                continue
+        
+        if not clients:
+            return {
+                "status": "failed",
+                "username": None,
+                "reason": "no_proxies_available",
+                "duration": 0
+            }
+
+        checker = AutoInstagramChecker(clients)
+        
+        # Launch workers
+        tasks = [asyncio.create_task(self._worker(checker)) for _ in range(self.max_concurrency)]
+        
+        # Wait for completion or stop
+        while not self.should_stop:
+            if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
+                self.should_stop = True
+                break
             
-            while not self.stop_event.is_set():
-                if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
-                    self.stop_event.set()
-                    break
-                time.sleep(0.1)
+            # Check if all tasks finished (e.g. if we had limited attempts, but here we loop forever)
+            # Actually, we should check if we found something
+            if self.found_username:
+                break
                 
+            await asyncio.sleep(0.1)
+
+        # Ensure all tasks stop
+        self.should_stop = True
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Cleanup clients
+        for c in clients:
+            await c.aclose()
+            
         return {
             "status": "success" if self.found_username else "failed",
             "username": self.found_username,
@@ -292,12 +399,12 @@ def home():
     })
 
 @app.route('/search')
-def search():
+async def search():
     """
     Triggers a search session.
     """
     session = SearchSession()
-    result = session.run()
+    result = await session.run()
     return jsonify(result)
 
 
