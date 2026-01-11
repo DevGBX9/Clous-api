@@ -205,9 +205,9 @@ async def search_available_username() -> Dict[str, Any]:
     if not PROXIES:
         return {"status": "failed", "reason": "no_proxies", "duration": 0}
     
-    # Create a client pool (one per proxy)
+    # Create a client pool (one per proxy) - use ALL proxies
     clients = []
-    for proxy in PROXIES[:30]:  # Use max 30 proxies for speed
+    for proxy in PROXIES:
         try:
             clients.append(httpx.AsyncClient(proxy=proxy, timeout=CONFIG["REQUEST_TIMEOUT"]))
         except:
