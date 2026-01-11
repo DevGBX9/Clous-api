@@ -89,20 +89,37 @@ app = Flask(__name__)
 CORS(app)
 
 # ==========================================
-#              IDENTITY GENERATOR
+#              FULL DEVICE FINGERPRINT
 # ==========================================
 @dataclass
 class Identity:
+    """Complete Android device identity for maximum stealth."""
     user_agent: str
+    device_id: str
+    phone_id: str
     guid: str
+    adid: str
+    google_adid: str
+    family_device_id: str
     headers: Dict[str, str]
 
 def generate_identity() -> Identity:
-    """Generate a fresh device identity."""
+    """
+    Generate a COMPLETE device identity for maximum stealth.
+    Simulates a real Android device with all fingerprint data.
+    """
     device = random.choice(DEVICES)
     version = random.choice(IG_VERSIONS)
-    guid = str(uuid4())
     
+    # Generate all unique IDs
+    device_id = f"android-{uuid4().hex[:16]}"
+    phone_id = str(uuid4())
+    guid = str(uuid4())
+    adid = str(uuid4())  # Google Advertising ID
+    google_adid = str(uuid4())
+    family_device_id = str(uuid4())
+    
+    # Build realistic User-Agent
     user_agent = (
         f"Instagram {version} Android "
         f"({device['android']}/{device['android']}.0; "
@@ -111,17 +128,40 @@ def generate_identity() -> Identity:
         f"{device['device']}; {device['board']}; en_US)"
     )
     
+    # Complete headers for maximum stealth
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Accept-Language': 'en-US',
+        'Accept-Language': random.choice(['en-US', 'en-GB', 'en-CA', 'en-AU', 'en-IN']),
         'Accept-Encoding': 'gzip, deflate',
         'User-Agent': user_agent,
         'X-IG-App-ID': '567067343352427',
+        'X-IG-App-Locale': 'en_US',
+        'X-IG-Device-Locale': 'en_US',
         'X-IG-Device-ID': guid,
-        'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE']),
+        'X-IG-Android-ID': device_id,
+        'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G', 'MOBILE.4G']),
+        'X-IG-Connection-Speed': f'{random.randint(1000, 5000)}kbps',
+        'X-IG-Bandwidth-Speed-KBPS': str(random.randint(2000, 10000)),
+        'X-IG-Bandwidth-TotalBytes-B': str(random.randint(1000000, 8000000)),
+        'X-IG-Bandwidth-TotalTime-MS': str(random.randint(50, 300)),
+        'X-IG-Capabilities': random.choice(['3brTvx0=', '3brTvwE=', '3brTvw8=']),
+        'X-Bloks-Version-Id': 'ce555e5500576acd8e84a66018f54a05720f2dce29f0bb5a1f97f0c10d6a9c9e',
+        'X-Bloks-Is-Layout-RTL': 'false',
+        'X-Pigeon-Session-Id': f'UFS-{uuid4()}-0',
+        'X-Pigeon-Rawclienttime': str(time.time()),
+        'X-MID': ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=28)),
     }
     
-    return Identity(user_agent=user_agent, guid=guid, headers=headers)
+    return Identity(
+        user_agent=user_agent,
+        device_id=device_id,
+        phone_id=phone_id,
+        guid=guid,
+        adid=adid,
+        google_adid=google_adid,
+        family_device_id=family_device_id,
+        headers=headers
+    )
 
 # ==========================================
 #              USERNAME GENERATOR
