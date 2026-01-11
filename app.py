@@ -50,7 +50,7 @@ CONFIG: Dict[str, Any] = {
     # Use the username check endpoint instead of create
     "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/users/check_username/',
     "TIMEOUT_SECONDS": 30,
-    "MAX_CONCURRENCY": 100,
+    "MAX_CONCURRENCY": 20,  # Reduced for faster stopping
     "REQUEST_TIMEOUT": 5.0,
     "PROXIES_FILE": "proxies.txt",
     "IDENTITIES_PER_PROXY": 2,
@@ -524,27 +524,35 @@ class SearchSession:
     async def _worker(self, checker: AutoInstagramChecker) -> None:
         """Async worker for checking usernames."""
         while not self.should_stop:
+            # Check stop conditions before doing any work
+            if self.should_stop or self.found_username:
+                return
+            
             if time.time() - self.start_time > CONFIG["TIMEOUT_SECONDS"]:
                 self.should_stop = True
                 return
 
             username = self.generator.generate()
+            
+            # Check again before sending request
+            if self.should_stop or self.found_username:
+                return
+            
             is_available, _, error = await checker.check_username_availability(username)
             
-            if self.should_stop:
+            # Check immediately after response
+            if self.should_stop or self.found_username:
                 return
 
             if error == "rate_limit":
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.3)
                 continue
             
-            if is_available:
+            if is_available and not self.found_username:
                 self.found_username = username
                 self.result_reason = "success"
                 self.should_stop = True
                 return
-            
-            await asyncio.sleep(0.01)
 
     async def run(self) -> Dict[str, Any]:
         """Start the search session."""
