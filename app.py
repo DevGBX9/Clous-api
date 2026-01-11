@@ -363,6 +363,7 @@ class AutoInstagramChecker:
     def __init__(self, identity_pool: IdentityPool):
         self.identity_pool = identity_pool
         self.clients: Dict[str, httpx.AsyncClient] = {}
+        self.logged_samples: int = 0  # Track how many sample responses we've logged
     
     async def _get_client(self, proxy_url: str) -> httpx.AsyncClient:
         """Get or create async client for proxy."""
@@ -390,14 +391,30 @@ class AutoInstagramChecker:
             )
             response_text = response.text
             
-            if '"spam"' in response_text or 'rate_limit_error' in response_text:
-                logger.warning(f"Rate limit on proxy: {proxy_identity.proxy_url[:30]}...")
+            # Log sample responses for debugging (first few only)
+            if self.logged_samples < 5:
+                self.logged_samples += 1
+                logger.info(f"📝 Sample response for '{username}': {response_text[:300]}...")
+            
+            # Check for rate limiting / spam detection
+            if '"spam"' in response_text or 'rate_limit_error' in response_text or '"challenge_required"' in response_text:
+                logger.warning(f"⚠️ Rate limit/Challenge on proxy")
                 return False, response_text, "rate_limit"
             
-            is_available = '"email_is_taken"' in response_text
+            # Username is AVAILABLE if:
+            # 1. "email_is_taken" appears (username passed, email check failed)
+            # 2. "username" error is NOT present (username is not taken)
+            # 3. Response indicates username passed validation
+            
+            username_is_taken = '"username_is_taken"' in response_text or '"username":["' in response_text
+            email_is_taken = '"email_is_taken"' in response_text
+            
+            # If username is not taken, it's available!
+            is_available = email_is_taken or (not username_is_taken and '"errors"' in response_text)
             
             if is_available:
                 logger.info(f"✅ Found available username: {username}")
+                logger.info(f"📄 Response: {response_text[:500]}")
             
             return is_available, response_text, None
             
