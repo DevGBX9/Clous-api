@@ -127,9 +127,44 @@ def generate_identity() -> Identity:
 #              USERNAME GENERATOR
 # ==========================================
 def generate_username() -> str:
-    """Generate a valid 5-character username."""
-    # Start with letter, then 4 alphanumeric
-    return random.choice(LETTERS) + ''.join(random.choices(CHARS, k=4))
+    """
+    Generate a valid 5-character username containing _ or . (or both).
+    
+    Instagram rules:
+    - Cannot start with .
+    - Cannot end with .
+    - No consecutive special chars (.. ._ _. __)
+    """
+    # Valid patterns for 5-char username with special char
+    # Position 0: must be letter
+    # Position 4: cannot be dot
+    # No consecutive specials
+    
+    patterns = [
+        # Single underscore patterns
+        "L_LLL", "LL_LL", "LLL_L", "LLLL_",
+        # Single dot patterns (not at end)
+        "L.LLL", "LL.LL", "LLL.L",
+        # Underscore + dot combinations (not consecutive)
+        "L_L.L", "L.L_L", "L_LL_",
+    ]
+    
+    pattern = random.choice(patterns)
+    result = []
+    
+    for char in pattern:
+        if char == 'L':
+            # Letter or digit (but first must be letter)
+            if len(result) == 0:
+                result.append(random.choice(LETTERS))
+            else:
+                result.append(random.choice(CHARS))
+        elif char == '_':
+            result.append('_')
+        elif char == '.':
+            result.append('.')
+    
+    return ''.join(result)
 
 # ==========================================
 #              CORE: CHECK ONE USERNAME
