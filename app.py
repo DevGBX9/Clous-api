@@ -169,26 +169,26 @@ def generate_username() -> str:
 # ==========================================
 #              CORE: CHECK ONE USERNAME
 # ==========================================
-async def check_one_username(client: httpx.AsyncClient, username: str, identity: Identity) -> Dict[str, Any]:
-    """Check a single username. Returns result dict."""
+async def check_one_username(client: httpx.AsyncClient, username: str, identity: Identity, proxy_index: int) -> Dict[str, Any]:
+    """Check a single username. Returns result dict with proxy_index."""
     try:
         data = {"username": username, "_uuid": identity.guid}
         response = await client.post(CONFIG["API_URL"], headers=identity.headers, data=data)
         text = response.text
         
         if '"available":true' in text or '"available": true' in text:
-            return {"status": "available", "username": username, "response": text}
+            return {"status": "available", "username": username, "proxy_index": proxy_index}
         elif '"available":false' in text or '"available": false' in text:
-            return {"status": "taken", "username": username}
+            return {"status": "taken", "username": username, "proxy_index": proxy_index}
         elif 'wait a few minutes' in text.lower():
-            return {"status": "rate_limit", "username": username}
+            return {"status": "rate_limit", "username": username, "proxy_index": proxy_index}
         else:
-            return {"status": "error", "username": username, "response": text[:200]}
+            return {"status": "error", "username": username, "proxy_index": proxy_index}
             
     except httpx.TimeoutException:
-        return {"status": "timeout", "username": username}
+        return {"status": "timeout", "username": username, "proxy_index": proxy_index}
     except Exception as e:
-        return {"status": "error", "username": username, "error": str(e)[:100]}
+        return {"status": "error", "username": username, "proxy_index": proxy_index}
 
 # ==========================================
 #              CORE: SEARCH (SIMPLE & FAST)
@@ -199,7 +199,8 @@ async def search_available_username() -> Dict[str, Any]:
     Stops IMMEDIATELY when found.
     """
     start_time = time.time()
-    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0}
+    stats = {"checked": 0, "taken": 0, "errors": 0}
+    rate_limited_proxies = set()  # Track unique proxies with rate limits
     
     if not PROXIES:
         return {"status": "failed", "reason": "no_proxies", "duration": 0}
@@ -224,12 +225,13 @@ async def search_available_username() -> Dict[str, Any]:
             # Generate batch of usernames
             usernames = [generate_username() for _ in range(batch_size)]
             
-            # Create tasks
+            # Create tasks with proxy index
             tasks = []
             for i, username in enumerate(usernames):
-                client = clients[i % len(clients)]
+                proxy_index = i % len(clients)
+                client = clients[proxy_index]
                 identity = generate_identity()
-                tasks.append(asyncio.create_task(check_one_username(client, username, identity)))
+                tasks.append(asyncio.create_task(check_one_username(client, username, identity, proxy_index)))
             
             # Process results AS THEY COME IN - return immediately on first available!
             for coro in asyncio.as_completed(tasks):
@@ -248,12 +250,13 @@ async def search_available_username() -> Dict[str, Any]:
                         "status": "success",
                         "username": result["username"],
                         "duration": duration,
-                        "stats": stats
+                        "stats": stats,
+                        "rate_limited_proxies": f"{len(rate_limited_proxies)}/{len(clients)}"
                     }
                 elif result["status"] == "taken":
                     stats["taken"] += 1
                 elif result["status"] == "rate_limit":
-                    stats["rate_limits"] += 1
+                    rate_limited_proxies.add(result["proxy_index"])
                 else:
                     stats["errors"] += 1
         
@@ -262,7 +265,8 @@ async def search_available_username() -> Dict[str, Any]:
             "status": "failed",
             "reason": "timeout",
             "duration": round(time.time() - start_time, 2),
-            "stats": stats
+            "stats": stats,
+            "rate_limited_proxies": f"{len(rate_limited_proxies)}/{len(clients)}"
         }
         
     finally:
