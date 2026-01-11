@@ -578,11 +578,15 @@ class SearchSession:
                     break
                 
                 if self.found_username:
+                    # Cancel all tasks immediately
+                    for task in tasks:
+                        task.cancel()
                     break
                     
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.05)  # Check more frequently
 
             self.should_stop = True
+            # Wait for cancellation to complete
             await asyncio.gather(*tasks, return_exceptions=True)
             
         finally:
