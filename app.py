@@ -47,13 +47,13 @@ logger = logging.getLogger(__name__)
 #              CONFIGURATION
 # ==========================================
 CONFIG: Dict[str, Any] = {
-    "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/accounts/create/',
+    # Use the username check endpoint instead of create
+    "INSTAGRAM_API_URL": 'https://i.instagram.com/api/v1/users/check_username/',
     "TIMEOUT_SECONDS": 30,
-    "FIXED_EMAIL": "abdo1@gmail.com",
     "MAX_CONCURRENCY": 100,
-    "REQUEST_TIMEOUT": 3.0,
+    "REQUEST_TIMEOUT": 5.0,
     "PROXIES_FILE": "proxies.txt",
-    "IDENTITIES_PER_PROXY": 2,  # Each proxy gets 2 identities to alternate
+    "IDENTITIES_PER_PROXY": 2,
 }
 
 CHARS: Dict[str, str] = {
@@ -115,18 +115,11 @@ class DeviceIdentity:
     family_device_id: str
     headers: Dict[str, str]
     
-    def get_request_data(self, username: str, email: str) -> Dict[str, str]:
-        """Generate request data with this identity."""
+    def get_request_data(self, username: str) -> Dict[str, str]:
+        """Generate request data for username check."""
         return {
-            "email": email,
             "username": username,
-            "password": f"Aa123456{username}",
-            "device_id": self.device_id,
-            "phone_id": self.phone_id,
-            "guid": self.guid,
-            "adid": self.adid,
-            "google_adid": self.google_adid,
-            "family_device_id": self.family_device_id,
+            "_uuid": self.guid,
         }
 
 
@@ -398,6 +391,12 @@ class AutoInstagramChecker:
             return "rate_limit"
         if '"challenge_required"' in response_text:
             return "challenge"
+        # New check_username endpoint responses
+        if '"available": true' in response_text or '"available":true' in response_text:
+            return "available"
+        if '"available": false' in response_text or '"available":false' in response_text:
+            return "taken"
+        # Old-style responses
         if '"username_is_taken"' in response_text:
             return "username_taken"
         if '"username":["' in response_text:
@@ -406,8 +405,10 @@ class AutoInstagramChecker:
             return "email_taken_username_available"
         if '"errors"' in response_text:
             return "other_error"
-        if '"status":"ok"' in response_text:
+        if '"status":"ok"' in response_text or '"status": "ok"' in response_text:
             return "success"
+        if 'Bad request' in response_text:
+            return "bad_request"
         return "unknown"
     
     def _log_sample_response(self, username: str, response_text: str, category: str):
@@ -435,7 +436,7 @@ class AutoInstagramChecker:
         try:
             client = await self._get_client(proxy_identity.proxy_url)
             
-            data = identity.get_request_data(username, CONFIG["FIXED_EMAIL"])
+            data = identity.get_request_data(username)
             
             response = await client.post(
                 CONFIG["INSTAGRAM_API_URL"],
@@ -460,16 +461,23 @@ class AutoInstagramChecker:
                 self.stats["rate_limits"] += 1
                 return False, response_text, "rate_limit"
             
-            # Check if username is taken
-            if category in ["username_taken", "username_error"]:
-                self.stats["username_taken"] += 1
-                return False, response_text, None
+            # For check_username endpoint:
+            # {"status": "ok", "username": "xxx", "available": true}  -> Available!
+            # {"status": "ok", "username": "xxx", "available": false} -> Taken
             
-            # Username is available if email_is_taken (means username passed!)
-            if category == "email_taken_username_available":
+            if '"available": true' in response_text or '"available":true' in response_text:
                 self.stats["username_available"] += 1
                 logger.info(f"✅✅✅ FOUND AVAILABLE USERNAME: {username}")
                 return True, response_text, None
+            
+            if '"available": false' in response_text or '"available":false' in response_text:
+                self.stats["username_taken"] += 1
+                return False, response_text, None
+            
+            # Check old-style username taken responses
+            if category in ["username_taken", "username_error"]:
+                self.stats["username_taken"] += 1
+                return False, response_text, None
             
             # Other cases
             self.stats["other_errors"] += 1
@@ -480,7 +488,6 @@ class AutoInstagramChecker:
             return False, "", "timeout"
         except httpx.RequestError as e:
             self.stats["connection_errors"] += 1
-            # Log first few connection errors
             if self.stats["connection_errors"] <= 3:
                 logger.warning(f"🔌 Connection error: {type(e).__name__}: {str(e)[:100]}")
             return False, "", "connection_error"
