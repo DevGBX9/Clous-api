@@ -183,27 +183,29 @@ async def search_available_username() -> Dict[str, Any]:
     logger.info(f"Starting search with {len(clients)} proxies...")
     
     try:
-        # Simple sequential search with parallel checking
-        batch_size = len(clients)  # Check as many as we have clients
+        batch_size = len(clients)
         
         while time.time() - start_time < CONFIG["TIMEOUT"]:
             # Generate batch of usernames
             usernames = [generate_username() for _ in range(batch_size)]
             
-            # Check all in parallel
+            # Create tasks
             tasks = []
             for i, username in enumerate(usernames):
                 client = clients[i % len(clients)]
                 identity = generate_identity()
-                tasks.append(check_one_username(client, username, identity))
+                tasks.append(asyncio.create_task(check_one_username(client, username, identity)))
             
-            results = await asyncio.gather(*tasks)
-            
-            # Process results - STOP AT FIRST AVAILABLE
-            for result in results:
+            # Process results AS THEY COME IN - return immediately on first available!
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
                 stats["checked"] += 1
                 
                 if result["status"] == "available":
+                    # Cancel remaining tasks
+                    for t in tasks:
+                        t.cancel()
+                    
                     duration = round(time.time() - start_time, 2)
                     logger.info(f"✅ FOUND: {result['username']} in {duration}s after {stats['checked']} checks")
                     
