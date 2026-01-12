@@ -273,6 +273,127 @@ class DynamicSessionManager:
 
 
 # ==========================================
+#     SESSION WARMING SYSTEM (Level 4)
+# ==========================================
+
+# Track warmed sessions globally
+WARMED_SESSIONS: Dict[str, float] = {}  # proxy_url -> last_warm_time
+WARM_DURATION = 300  # Session stays warm for 5 minutes
+
+# Instagram endpoints for warming
+WARM_ENDPOINTS = [
+    ("GET", "https://i.instagram.com/api/v1/launcher/sync/"),
+    ("POST", "https://i.instagram.com/api/v1/qe/sync/"),
+]
+
+
+def is_session_warm(proxy_url: str) -> bool:
+    """Check if a session is still warm."""
+    if proxy_url in WARMED_SESSIONS:
+        if time.time() - WARMED_SESSIONS[proxy_url] < WARM_DURATION:
+            return True
+        # Expired
+        del WARMED_SESSIONS[proxy_url]
+    return False
+
+
+def mark_session_warm(proxy_url: str):
+    """Mark a session as warm."""
+    WARMED_SESSIONS[proxy_url] = time.time()
+
+
+def get_warm_count() -> int:
+    """Get count of currently warm sessions."""
+    now = time.time()
+    # Clean up expired
+    expired = [p for p, t in WARMED_SESSIONS.items() if now - t >= WARM_DURATION]
+    for p in expired:
+        del WARMED_SESSIONS[p]
+    return len(WARMED_SESSIONS)
+
+
+async def warm_single_session(proxy_url: str, identity: Dict[str, Any]) -> bool:
+    """
+    Warm a single session by making 1-2 'normal' requests.
+    Returns True if successful.
+    """
+    try:
+        async with httpx.AsyncClient(
+            proxy=proxy_url,
+            timeout=CONFIG["REQUEST_TIMEOUT"]
+        ) as client:
+            # Make a launcher sync request (like app opening)
+            headers = identity["headers"].copy()
+            
+            # Launcher sync request
+            try:
+                response = await client.get(
+                    "https://i.instagram.com/api/v1/launcher/sync/",
+                    headers=headers
+                )
+                # Any response is okay - we just want to "touch" Instagram
+            except:
+                pass
+            
+            # Small delay
+            await asyncio.sleep(random.uniform(0.3, 0.8))
+            
+            # QE sync request (optional, simulate app behavior)
+            try:
+                data = {
+                    "_uuid": identity["guid"],
+                    "experiments": "ig_android_device_detection_info_upload",
+                }
+                await client.post(
+                    "https://i.instagram.com/api/v1/qe/sync/",
+                    headers=headers,
+                    data=data
+                )
+            except:
+                pass
+            
+            mark_session_warm(proxy_url)
+            return True
+            
+    except Exception as e:
+        logger.debug(f"Warm failed for {proxy_url[:30]}: {e}")
+        return False
+
+
+async def warm_all_sessions_background():
+    """
+    Background task to warm all proxy sessions.
+    Called once when server starts.
+    """
+    logger.info("🔥 Starting background session warming...")
+    
+    warmed = 0
+    for proxy_url in PROXIES:
+        if is_proxy_available(proxy_url) and not is_session_warm(proxy_url):
+            identity = generate_identity()
+            success = await warm_single_session(proxy_url, identity)
+            if success:
+                warmed += 1
+            # Don't hammer - small delay between proxies
+            await asyncio.sleep(random.uniform(0.2, 0.5))
+    
+    logger.info(f"🔥 Warmed {warmed}/{len(PROXIES)} sessions")
+
+
+async def ensure_session_warm(proxy_url: str, identity: Dict[str, Any]) -> bool:
+    """
+    Ensure a session is warm before checking username.
+    If already warm, returns immediately.
+    If cold, warms it first.
+    """
+    if is_session_warm(proxy_url):
+        return True
+    
+    # Need to warm
+    return await warm_single_session(proxy_url, identity)
+
+
+# ==========================================
 #     HUMAN-LIKE TIMING (Level 2)
 # ==========================================
 async def human_delay():
@@ -308,15 +429,20 @@ def generate_simple_username() -> str:
 async def check_username(
     client: httpx.AsyncClient,
     proxy_with_id: ProxyWithDualIdentity,
-    username: str
+    username: str,
+    ensure_warm: bool = True
 ) -> Dict[str, Any]:
-    """Check a single username with dynamic identity."""
+    """Check a single username with dynamic identity and session warming."""
     try:
-        # Simulate typing the username
-        await simulate_typing_delay(username)
-        
         # Get current identity
         identity = proxy_with_id.get_current_identity()
+        
+        # Ensure session is warm (Level 4: Session Warming)
+        if ensure_warm:
+            await ensure_session_warm(proxy_with_id.proxy_url, identity)
+        
+        # Simulate typing the username
+        await simulate_typing_delay(username)
         
         data = {
             "username": username,
@@ -331,6 +457,9 @@ async def check_username(
         
         # Rotate to other identity for next request
         proxy_with_id.rotate()
+        
+        # Mark session as warm (successful request)
+        mark_session_warm(proxy_with_id.proxy_url)
         
         text = response.text
         
@@ -425,7 +554,8 @@ async def stealth_search() -> Dict[str, Any]:
                     "username": result["username"],
                     "duration": duration,
                     "stats": stats,
-                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
+                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+                    "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
                 }
                 
             elif result["status"] == "taken":
@@ -446,7 +576,8 @@ async def stealth_search() -> Dict[str, Any]:
         "reason": "timeout",
         "duration": round(time.time() - start_time, 2),
         "stats": stats,
-        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
+        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+        "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
     }
 
 
@@ -485,7 +616,11 @@ async def detailed_stealth_search() -> Dict[str, Any]:
     if not PROXIES:
         return {"status": "failed", "reason": "no_proxies", "detailed_log": detailed_log}
     
-    log_event("INIT", {"proxies_count": len(PROXIES), "config": CONFIG})
+    log_event("INIT", {
+        "proxies_count": len(PROXIES), 
+        "warm_sessions": get_warm_count(),
+        "config": CONFIG
+    })
     
     # Create FRESH session manager with NEW identities
     manager = DynamicSessionManager(PROXIES)
@@ -661,17 +796,53 @@ def home():
         "message": "Instagram Username Checker - ULTIMATE STEALTH Edition",
         "endpoints": {
             "/search": "Quick search - returns username only",
-            "/infosearch": "Detailed search - returns EVERYTHING"
+            "/infosearch": "Detailed search - returns EVERYTHING",
+            "/warm": "Pre-warm all proxy sessions",
+            "/status": "Get current status"
         },
         "features": [
-            "Simple usernames (high availability)",
-            "Session persistence per proxy",
+            "Dynamic identities (fresh each request)",
+            "Dual identity rotation per proxy",
+            "Session warming (Level 4)",
             "Human-like timing patterns",
             "Smart proxy rotation",
             "Rate limit handling with cooldown"
         ],
-        "proxies": len(PROXIES),
-        "stealth_level": "MAXIMUM"
+        "proxies": {
+            "total": len(PROXIES),
+            "warm": get_warm_count(),
+            "rate_limited": get_rate_limited_count()
+        },
+        "stealth_level": "MAXIMUM + WARMING"
+    })
+
+
+@app.route('/status')
+def status():
+    """Get current status of all systems."""
+    return jsonify({
+        "proxies": {
+            "total": len(PROXIES),
+            "warm": get_warm_count(),
+            "cold": len(PROXIES) - get_warm_count(),
+            "rate_limited": get_rate_limited_count(),
+            "available": len(PROXIES) - get_rate_limited_count()
+        },
+        "warming": {
+            "warm_duration_seconds": WARM_DURATION,
+            "warmed_sessions": list(WARMED_SESSIONS.keys())[:10]  # First 10 only
+        }
+    })
+
+
+@app.route('/warm')
+async def warm():
+    """Manually warm all proxy sessions."""
+    await warm_all_sessions_background()
+    return jsonify({
+        "status": "success",
+        "message": "All sessions warmed",
+        "warm_count": get_warm_count()
     })
 
 @app.route('/search')
