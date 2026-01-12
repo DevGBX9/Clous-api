@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Instagram Username Checker - Clean & Fast API
-==============================================
+Instagram Username Checker - ULTIMATE STEALTH Edition
+======================================================
 
-Simple, fast, and reliable username checking.
-Stops IMMEDIATELY when first available username is found.
+Maximum stealth with all protection levels:
+- Level 1: Simple usernames, random delays
+- Level 2: Session persistence, human-like timing
+- Level 3: Smart proxy rotation, enhanced fingerprints
 
 Author: @GBX_9
 """
@@ -17,9 +19,9 @@ import random
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 from uuid import uuid4
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 from flask import Flask, jsonify
@@ -42,26 +44,41 @@ logger = logging.getLogger(__name__)
 # ==========================================
 CONFIG = {
     "API_URL": 'https://i.instagram.com/api/v1/users/check_username/',
-    "TIMEOUT": 30,
-    "REQUEST_TIMEOUT": 5.0,
+    "TIMEOUT": 60,  # Increased for slower, safer requests
+    "REQUEST_TIMEOUT": 8.0,
     "PROXIES_FILE": "proxies.txt",
+    
+    # Stealth settings
+    "MIN_DELAY": 0.8,       # Minimum delay between requests (seconds)
+    "MAX_DELAY": 2.5,       # Maximum delay between requests (seconds)
+    "MAX_CONCURRENT": 15,   # Maximum concurrent requests (reduced for stealth)
+    "COOLDOWN_TIME": 30,    # Seconds to wait before reusing rate-limited proxy
+    "TYPING_SIMULATION": True,  # Simulate human typing patterns
 }
 
 CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 
-# Android devices database
+# Extended Android devices database
 DEVICES = [
-    {"manufacturer": "Samsung", "model": "SM-G998B", "device": "p3s", "board": "exynos2100", "android": 13, "dpi": 640, "res": "1440x3200"},
-    {"manufacturer": "Samsung", "model": "SM-A525F", "device": "a52q", "board": "qcom", "android": 12, "dpi": 440, "res": "1080x2340"},
-    {"manufacturer": "Google", "model": "Pixel 7 Pro", "device": "cheetah", "board": "google", "android": 14, "dpi": 560, "res": "1440x3120"},
-    {"manufacturer": "Google", "model": "Pixel 6a", "device": "bluejay", "board": "google", "android": 13, "dpi": 420, "res": "1080x2400"},
-    {"manufacturer": "OnePlus", "model": "LE2123", "device": "lemonadep", "board": "lahaina", "android": 13, "dpi": 560, "res": "1440x3216"},
-    {"manufacturer": "Xiaomi", "model": "M2101K6G", "device": "sweet", "board": "qcom", "android": 12, "dpi": 440, "res": "1080x2400"},
-    {"manufacturer": "OPPO", "model": "CPH2207", "device": "OP4F7C", "board": "mt6893", "android": 12, "dpi": 480, "res": "1080x2400"},
+    {"manufacturer": "Samsung", "model": "SM-G998B", "device": "p3s", "board": "exynos2100", "android": 13, "dpi": 640, "res": "1440x3200", "country": "US"},
+    {"manufacturer": "Samsung", "model": "SM-S908B", "device": "b0q", "board": "exynos2200", "android": 14, "dpi": 600, "res": "1440x3088", "country": "GB"},
+    {"manufacturer": "Samsung", "model": "SM-A536B", "device": "a53x", "board": "exynos1280", "android": 13, "dpi": 450, "res": "1080x2400", "country": "DE"},
+    {"manufacturer": "Samsung", "model": "SM-A525F", "device": "a52q", "board": "qcom", "android": 12, "dpi": 440, "res": "1080x2340", "country": "FR"},
+    {"manufacturer": "Google", "model": "Pixel 8 Pro", "device": "husky", "board": "google", "android": 14, "dpi": 560, "res": "1344x2992", "country": "US"},
+    {"manufacturer": "Google", "model": "Pixel 7 Pro", "device": "cheetah", "board": "google", "android": 14, "dpi": 560, "res": "1440x3120", "country": "US"},
+    {"manufacturer": "Google", "model": "Pixel 6a", "device": "bluejay", "board": "google", "android": 13, "dpi": 420, "res": "1080x2400", "country": "CA"},
+    {"manufacturer": "OnePlus", "model": "CPH2451", "device": "OP5958L1", "board": "taro", "android": 14, "dpi": 560, "res": "1440x3216", "country": "IN"},
+    {"manufacturer": "OnePlus", "model": "LE2123", "device": "lemonadep", "board": "lahaina", "android": 13, "dpi": 560, "res": "1440x3216", "country": "US"},
+    {"manufacturer": "Xiaomi", "model": "2201116SG", "device": "ingres", "board": "mt6895", "android": 13, "dpi": 480, "res": "1220x2712", "country": "IN"},
+    {"manufacturer": "Xiaomi", "model": "M2101K6G", "device": "sweet", "board": "qcom", "android": 12, "dpi": 440, "res": "1080x2400", "country": "RU"},
+    {"manufacturer": "OPPO", "model": "CPH2449", "device": "OP5961L1", "board": "mt6895", "android": 13, "dpi": 480, "res": "1080x2400", "country": "ID"},
 ]
 
-IG_VERSIONS = ["269.0.0.18.75", "268.0.0.23.118", "267.0.0.19.93", "266.0.0.22.105", "265.0.0.19.301"]
+IG_VERSIONS = [
+    "315.0.0.26.109", "314.0.0.24.110", "313.0.0.28.109", "312.0.0.32.118",
+    "311.0.0.32.119", "310.0.0.28.117", "309.0.0.40.113", "308.0.0.38.108",
+]
 
 # ==========================================
 #              LOAD PROXIES
@@ -89,233 +106,302 @@ app = Flask(__name__)
 CORS(app)
 
 # ==========================================
-#              FULL DEVICE FINGERPRINT
+#     PERSISTENT PROXY SESSION (Level 2)
 # ==========================================
 @dataclass
-class Identity:
-    """Complete Android device identity for maximum stealth."""
-    user_agent: str
+class ProxySession:
+    """Persistent session for each proxy - simulates a real device."""
+    proxy_url: str
+    device: Dict[str, Any]
+    ig_version: str
     device_id: str
     phone_id: str
     guid: str
     adid: str
-    google_adid: str
-    family_device_id: str
-    headers: Dict[str, str]
-
-def generate_identity() -> Identity:
-    """
-    Generate a COMPLETE device identity for maximum stealth.
-    Simulates a real Android device with all fingerprint data.
-    """
-    device = random.choice(DEVICES)
-    version = random.choice(IG_VERSIONS)
+    mid: str
+    session_id: str
+    last_request_time: float = 0
+    request_count: int = 0
+    is_rate_limited: bool = False
+    rate_limit_until: float = 0
     
-    # Generate all unique IDs
-    device_id = f"android-{uuid4().hex[:16]}"
-    phone_id = str(uuid4())
-    guid = str(uuid4())
-    adid = str(uuid4())  # Google Advertising ID
-    google_adid = str(uuid4())
-    family_device_id = str(uuid4())
+    def get_headers(self) -> Dict[str, str]:
+        """Get consistent headers for this session."""
+        user_agent = (
+            f"Instagram {self.ig_version} Android "
+            f"({self.device['android']}/{self.device['android']}.0; "
+            f"{self.device['dpi']}dpi; {self.device['res']}; "
+            f"{self.device['manufacturer']}; {self.device['model']}; "
+            f"{self.device['device']}; {self.device['board']}; en_{self.device['country']})"
+        )
+        
+        return {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept': '*/*',
+            'Accept-Language': f"en-{self.device['country']},en;q=0.9",
+            'Accept-Encoding': 'gzip, deflate, br',
+            'User-Agent': user_agent,
+            'X-IG-App-ID': '567067343352427',
+            'X-IG-App-Locale': f"en_{self.device['country']}",
+            'X-IG-Device-Locale': f"en_{self.device['country']}",
+            'X-IG-Mapped-Locale': f"en_{self.device['country']}",
+            'X-IG-Device-ID': self.guid,
+            'X-IG-Family-Device-ID': self.phone_id,
+            'X-IG-Android-ID': self.device_id,
+            'X-IG-Timezone-Offset': str(random.choice([-18000, -14400, 0, 3600, 7200, 19800])),
+            'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G']),
+            'X-IG-Connection-Speed': f'{random.randint(1500, 4000)}kbps',
+            'X-IG-Bandwidth-Speed-KBPS': str(random.randint(3000, 12000)),
+            'X-IG-Bandwidth-TotalBytes-B': str(random.randint(2000000, 10000000)),
+            'X-IG-Bandwidth-TotalTime-MS': str(random.randint(100, 400)),
+            'X-IG-Capabilities': random.choice(['3brTvx0=', '3brTv58=', '3brTv50=']),
+            'X-IG-WWW-Claim': '0',
+            'X-Bloks-Version-Id': 'e538d4591f238824118bfcb9528c8d005f2ea3becd947a3973c030ac971bb88e',
+            'X-Bloks-Is-Layout-RTL': 'false',
+            'X-Bloks-Is-Panorama-Enabled': 'true',
+            'X-Pigeon-Session-Id': self.session_id,
+            'X-Pigeon-Rawclienttime': str(time.time()),
+            'X-MID': self.mid,
+            'X-FB-HTTP-Engine': 'Liger',
+            'X-FB-Client-IP': 'True',
+            'X-FB-Server-Cluster': 'True',
+        }
     
-    # Build realistic User-Agent
-    user_agent = (
-        f"Instagram {version} Android "
-        f"({device['android']}/{device['android']}.0; "
-        f"{device['dpi']}dpi; {device['res']}; "
-        f"{device['manufacturer']}; {device['model']}; "
-        f"{device['device']}; {device['board']}; en_US)"
-    )
-    
-    # Complete headers for maximum stealth
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Accept-Language': random.choice(['en-US', 'en-GB', 'en-CA', 'en-AU', 'en-IN']),
-        'Accept-Encoding': 'gzip, deflate',
-        'User-Agent': user_agent,
-        'X-IG-App-ID': '567067343352427',
-        'X-IG-App-Locale': 'en_US',
-        'X-IG-Device-Locale': 'en_US',
-        'X-IG-Device-ID': guid,
-        'X-IG-Android-ID': device_id,
-        'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G', 'MOBILE.4G']),
-        'X-IG-Connection-Speed': f'{random.randint(1000, 5000)}kbps',
-        'X-IG-Bandwidth-Speed-KBPS': str(random.randint(2000, 10000)),
-        'X-IG-Bandwidth-TotalBytes-B': str(random.randint(1000000, 8000000)),
-        'X-IG-Bandwidth-TotalTime-MS': str(random.randint(50, 300)),
-        'X-IG-Capabilities': random.choice(['3brTvx0=', '3brTvwE=', '3brTvw8=']),
-        'X-Bloks-Version-Id': 'ce555e5500576acd8e84a66018f54a05720f2dce29f0bb5a1f97f0c10d6a9c9e',
-        'X-Bloks-Is-Layout-RTL': 'false',
-        'X-Pigeon-Session-Id': f'UFS-{uuid4()}-0',
-        'X-Pigeon-Rawclienttime': str(time.time()),
-        'X-MID': ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=28)),
-    }
-    
-    return Identity(
-        user_agent=user_agent,
-        device_id=device_id,
-        phone_id=phone_id,
-        guid=guid,
-        adid=adid,
-        google_adid=google_adid,
-        family_device_id=family_device_id,
-        headers=headers
-    )
-
-# ==========================================
-#              USERNAME GENERATOR
-# ==========================================
-def generate_username() -> str:
-    """
-    Generate a valid 5-character username containing _ or . (or both).
-    
-    Instagram rules:
-    - Cannot start with .
-    - Cannot end with .
-    - No consecutive special chars (.. ._ _. __)
-    """
-    # Valid patterns for 5-char username with special char
-    # Position 0: must be letter
-    # Position 4: cannot be dot
-    # No consecutive specials
-    
-    patterns = [
-        # Single underscore patterns
-        "L_LLL", "LL_LL", "LLL_L", "LLLL_",
-        # Single dot patterns (not at end)
-        "L.LLL", "LL.LL", "LLL.L",
-        # Underscore + dot combinations (not consecutive)
-        "L_L.L", "L.L_L", "L_LL_",
-    ]
-    
-    pattern = random.choice(patterns)
-    result = []
-    
-    for char in pattern:
-        if char == 'L':
-            # Letter or digit (but first must be letter)
-            if len(result) == 0:
-                result.append(random.choice(LETTERS))
+    def can_make_request(self) -> bool:
+        """Check if this proxy can make a request now."""
+        if self.is_rate_limited:
+            if time.time() > self.rate_limit_until:
+                self.is_rate_limited = False
             else:
-                result.append(random.choice(CHARS))
-        elif char == '_':
-            result.append('_')
-        elif char == '.':
-            result.append('.')
+                return False
+        return True
     
-    return ''.join(result)
+    def mark_rate_limited(self):
+        """Mark this proxy as rate-limited."""
+        self.is_rate_limited = True
+        self.rate_limit_until = time.time() + CONFIG["COOLDOWN_TIME"]
+
+
+class ProxySessionManager:
+    """Manages persistent sessions for all proxies."""
+    
+    def __init__(self, proxies: List[str]):
+        self.sessions: Dict[str, ProxySession] = {}
+        self.clients: Dict[str, httpx.AsyncClient] = {}
+        self._create_sessions(proxies)
+    
+    def _create_sessions(self, proxies: List[str]):
+        """Create persistent sessions for each proxy."""
+        for proxy in proxies:
+            device = random.choice(DEVICES)
+            self.sessions[proxy] = ProxySession(
+                proxy_url=proxy,
+                device=device,
+                ig_version=random.choice(IG_VERSIONS),
+                device_id=f"android-{uuid4().hex[:16]}",
+                phone_id=str(uuid4()),
+                guid=str(uuid4()),
+                adid=str(uuid4()),
+                mid=''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-', k=28)),
+                session_id=f"UFS-{uuid4()}-0",
+            )
+        logger.info(f"Created {len(self.sessions)} persistent proxy sessions")
+    
+    def get_available_sessions(self) -> List[ProxySession]:
+        """Get all sessions that are not rate-limited."""
+        return [s for s in self.sessions.values() if s.can_make_request()]
+    
+    def get_rate_limited_count(self) -> int:
+        """Get count of rate-limited proxies."""
+        return sum(1 for s in self.sessions.values() if s.is_rate_limited)
+    
+    async def get_client(self, session: ProxySession) -> httpx.AsyncClient:
+        """Get or create client for a session."""
+        if session.proxy_url not in self.clients:
+            self.clients[session.proxy_url] = httpx.AsyncClient(
+                proxy=session.proxy_url,
+                timeout=CONFIG["REQUEST_TIMEOUT"],
+                http2=True  # Use HTTP/2 for better stealth
+            )
+        return self.clients[session.proxy_url]
+    
+    async def close_all(self):
+        """Close all clients."""
+        for client in self.clients.values():
+            try:
+                await client.aclose()
+            except:
+                pass
+        self.clients.clear()
+
 
 # ==========================================
-#              CORE: CHECK ONE USERNAME
+#     HUMAN-LIKE TIMING (Level 2)
 # ==========================================
-async def check_one_username(client: httpx.AsyncClient, username: str, identity: Identity, proxy_index: int) -> Dict[str, Any]:
-    """Check a single username. Returns result dict with proxy_index."""
+async def human_delay():
+    """Simulate human-like delay between actions."""
+    # Variable delay with occasional longer pauses
+    if random.random() < 0.1:  # 10% chance of longer pause
+        delay = random.uniform(2.0, 4.0)
+    else:
+        delay = random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
+    
+    await asyncio.sleep(delay)
+
+
+async def simulate_typing_delay(username: str):
+    """Simulate the delay of typing a username."""
+    if CONFIG["TYPING_SIMULATION"]:
+        # Average typing speed: 40-60 WPM = ~200-300ms per character
+        typing_time = len(username) * random.uniform(0.05, 0.15)
+        await asyncio.sleep(typing_time)
+
+
+# ==========================================
+#     USERNAME GENERATOR (Level 1 - Simple)
+# ==========================================
+def generate_simple_username() -> str:
+    """Generate a simple 5-char username (NO symbols) - higher availability!"""
+    return random.choice(LETTERS) + ''.join(random.choices(CHARS, k=4))
+
+
+# ==========================================
+#     CORE: CHECK USERNAME
+# ==========================================
+async def check_username(
+    client: httpx.AsyncClient,
+    session: ProxySession,
+    username: str
+) -> Dict[str, Any]:
+    """Check a single username with full stealth."""
     try:
-        data = {"username": username, "_uuid": identity.guid}
-        response = await client.post(CONFIG["API_URL"], headers=identity.headers, data=data)
+        # Simulate typing the username
+        await simulate_typing_delay(username)
+        
+        data = {
+            "username": username,
+            "_uuid": session.guid,
+        }
+        
+        response = await client.post(
+            CONFIG["API_URL"],
+            headers=session.get_headers(),
+            data=data
+        )
+        
+        session.request_count += 1
+        session.last_request_time = time.time()
+        
         text = response.text
         
         if '"available":true' in text or '"available": true' in text:
-            return {"status": "available", "username": username, "proxy_index": proxy_index}
+            return {"status": "available", "username": username}
         elif '"available":false' in text or '"available": false' in text:
-            return {"status": "taken", "username": username, "proxy_index": proxy_index}
-        elif 'wait a few minutes' in text.lower():
-            return {"status": "rate_limit", "username": username, "proxy_index": proxy_index}
+            return {"status": "taken", "username": username}
+        elif 'wait a few minutes' in text.lower() or 'rate_limit' in text.lower():
+            session.mark_rate_limited()
+            return {"status": "rate_limit", "username": username}
+        elif 'challenge_required' in text.lower():
+            session.mark_rate_limited()
+            return {"status": "challenge", "username": username}
         else:
-            return {"status": "error", "username": username, "proxy_index": proxy_index}
+            return {"status": "error", "username": username, "response": text[:100]}
             
     except httpx.TimeoutException:
-        return {"status": "timeout", "username": username, "proxy_index": proxy_index}
+        return {"status": "timeout", "username": username}
     except Exception as e:
-        return {"status": "error", "username": username, "proxy_index": proxy_index}
+        return {"status": "error", "username": username, "error": str(e)[:50]}
+
 
 # ==========================================
-#              CORE: SEARCH (SIMPLE & FAST)
+#     SMART SEARCH WITH ALL STEALTH LEVELS
 # ==========================================
-async def search_available_username() -> Dict[str, Any]:
+async def stealth_search() -> Dict[str, Any]:
     """
-    Search for ONE available username.
-    Stops IMMEDIATELY when found.
+    Search with MAXIMUM STEALTH:
+    - Level 1: Simple usernames, random delays
+    - Level 2: Session persistence, human-like timing
+    - Level 3: Smart proxy rotation, rate limit handling
     """
     start_time = time.time()
     stats = {"checked": 0, "taken": 0, "errors": 0}
-    rate_limited_proxies = set()  # Track unique proxies with rate limits
     
     if not PROXIES:
         return {"status": "failed", "reason": "no_proxies", "duration": 0}
     
-    # Create a client pool (one per proxy) - use ALL proxies
-    clients = []
-    for proxy in PROXIES:
-        try:
-            clients.append(httpx.AsyncClient(proxy=proxy, timeout=CONFIG["REQUEST_TIMEOUT"]))
-        except:
-            pass
+    # Create session manager (Level 2: Session Persistence)
+    manager = ProxySessionManager(PROXIES)
     
-    if not clients:
-        return {"status": "failed", "reason": "no_valid_proxies", "duration": 0}
-    
-    logger.info(f"Starting search with {len(clients)} proxies...")
+    logger.info(f"🛡️ Starting STEALTH search with {len(PROXIES)} proxy sessions...")
     
     try:
-        batch_size = len(clients)
-        
         while time.time() - start_time < CONFIG["TIMEOUT"]:
-            # Generate batch of usernames
-            usernames = [generate_username() for _ in range(batch_size)]
+            # Get available (non-rate-limited) sessions
+            available_sessions = manager.get_available_sessions()
             
-            # Create tasks with proxy index
+            if not available_sessions:
+                logger.warning("All proxies rate-limited! Waiting for cooldown...")
+                await asyncio.sleep(5)
+                continue
+            
+            # Limit concurrent requests (Level 1)
+            sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
+            
+            # Generate usernames
+            usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
+            
+            # Create tasks
             tasks = []
-            for i, username in enumerate(usernames):
-                proxy_index = i % len(clients)
-                client = clients[proxy_index]
-                identity = generate_identity()
-                tasks.append(asyncio.create_task(check_one_username(client, username, identity, proxy_index)))
+            for session, username in zip(sessions_to_use, usernames):
+                client = await manager.get_client(session)
+                tasks.append(asyncio.create_task(check_username(client, session, username)))
             
-            # Process results AS THEY COME IN - return immediately on first available!
+            # Process results as they come in
             for coro in asyncio.as_completed(tasks):
                 result = await coro
                 stats["checked"] += 1
                 
                 if result["status"] == "available":
-                    # Cancel remaining tasks
+                    # Found! Cancel remaining and return
                     for t in tasks:
                         t.cancel()
                     
                     duration = round(time.time() - start_time, 2)
-                    logger.info(f"✅ FOUND: {result['username']} in {duration}s after {stats['checked']} checks")
+                    rate_limited = manager.get_rate_limited_count()
+                    
+                    logger.info(f"✅ FOUND: {result['username']} in {duration}s")
                     
                     return {
                         "status": "success",
                         "username": result["username"],
                         "duration": duration,
                         "stats": stats,
-                        "rate_limited_proxies": f"{len(rate_limited_proxies)}/{len(clients)}"
+                        "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
                     }
+                    
                 elif result["status"] == "taken":
                     stats["taken"] += 1
-                elif result["status"] == "rate_limit":
-                    rate_limited_proxies.add(result["proxy_index"])
+                elif result["status"] in ["rate_limit", "challenge"]:
+                    pass  # Already handled in check_username
                 else:
                     stats["errors"] += 1
+            
+            # Human-like delay between batches (Level 2)
+            await human_delay()
         
         # Timeout
+        rate_limited = manager.get_rate_limited_count()
         return {
             "status": "failed",
             "reason": "timeout",
             "duration": round(time.time() - start_time, 2),
             "stats": stats,
-            "rate_limited_proxies": f"{len(rate_limited_proxies)}/{len(clients)}"
+            "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
         }
         
     finally:
-        # Cleanup
-        for client in clients:
-            try:
-                await client.aclose()
-            except:
-                pass
+        await manager.close_all()
+
 
 # ==========================================
 #              API ROUTES
@@ -324,15 +410,22 @@ async def search_available_username() -> Dict[str, Any]:
 def home():
     return jsonify({
         "status": "online",
-        "message": "Instagram Username Checker - Clean & Fast",
-        "usage": "GET /search",
-        "proxies": len(PROXIES)
+        "message": "Instagram Username Checker - ULTIMATE STEALTH Edition",
+        "features": [
+            "Simple usernames (high availability)",
+            "Session persistence per proxy",
+            "Human-like timing patterns",
+            "Smart proxy rotation",
+            "Rate limit handling with cooldown"
+        ],
+        "proxies": len(PROXIES),
+        "stealth_level": "MAXIMUM"
     })
 
 @app.route('/search')
 async def search():
-    """Find one available username."""
-    result = await search_available_username()
+    """Find one available username with maximum stealth."""
+    result = await stealth_search()
     return jsonify(result)
 
 # ==========================================
@@ -340,5 +433,6 @@ async def search():
 # ==========================================
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
-    logger.info(f"Starting server on port {port}")
+    logger.info(f"🚀 Starting ULTIMATE STEALTH server on port {port}")
+    logger.info(f"🛡️ Stealth features: Session persistence, Human timing, Smart rotation")
     app.run(host='0.0.0.0', port=port)
