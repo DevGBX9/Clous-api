@@ -220,8 +220,7 @@ class ProxySessionManager:
         if session.proxy_url not in self.clients:
             self.clients[session.proxy_url] = httpx.AsyncClient(
                 proxy=session.proxy_url,
-                timeout=CONFIG["REQUEST_TIMEOUT"],
-                http2=True  # Use HTTP/2 for better stealth
+                timeout=CONFIG["REQUEST_TIMEOUT"]
             )
         return self.clients[session.proxy_url]
     
