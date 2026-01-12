@@ -333,73 +333,74 @@ async def stealth_search() -> Dict[str, Any]:
     
     logger.info(f"🛡️ Starting STEALTH search with {len(PROXIES)} proxy sessions...")
     
-    try:
-        while time.time() - start_time < CONFIG["TIMEOUT"]:
-            # Get available (non-rate-limited) sessions
-            available_sessions = manager.get_available_sessions()
+    while time.time() - start_time < CONFIG["TIMEOUT"]:
+        # Get available (non-rate-limited) sessions
+        available_sessions = manager.get_available_sessions()
+        
+        if not available_sessions:
+            logger.warning("All proxies rate-limited! Waiting for cooldown...")
+            await asyncio.sleep(5)
+            continue
+        
+        # Limit concurrent requests (Level 1)
+        sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
+        
+        # Generate usernames
+        usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
+        
+        # Create tasks
+        tasks = []
+        for session, username in zip(sessions_to_use, usernames):
+            client = await manager.get_client(session)
+            tasks.append(asyncio.create_task(check_username(client, session, username)))
+        
+        # Process results as they come in
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            stats["checked"] += 1
             
-            if not available_sessions:
-                logger.warning("All proxies rate-limited! Waiting for cooldown...")
-                await asyncio.sleep(5)
-                continue
-            
-            # Limit concurrent requests (Level 1)
-            sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
-            
-            # Generate usernames
-            usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
-            
-            # Create tasks
-            tasks = []
-            for session, username in zip(sessions_to_use, usernames):
-                client = await manager.get_client(session)
-                tasks.append(asyncio.create_task(check_username(client, session, username)))
-            
-            # Process results as they come in
-            for coro in asyncio.as_completed(tasks):
-                result = await coro
-                stats["checked"] += 1
+            if result["status"] == "available":
+                # Found! Cancel remaining and return
+                for t in tasks:
+                    t.cancel()
                 
-                if result["status"] == "available":
-                    # Found! Cancel remaining and return
-                    for t in tasks:
-                        t.cancel()
-                    
-                    duration = round(time.time() - start_time, 2)
-                    rate_limited = manager.get_rate_limited_count()
-                    
-                    logger.info(f"✅ FOUND: {result['username']} in {duration}s")
-                    
-                    return {
-                        "status": "success",
-                        "username": result["username"],
-                        "duration": duration,
-                        "stats": stats,
-                        "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
-                    }
-                    
-                elif result["status"] == "taken":
-                    stats["taken"] += 1
-                elif result["status"] in ["rate_limit", "challenge"]:
-                    pass  # Already handled in check_username
-                else:
-                    stats["errors"] += 1
-            
-            # Human-like delay between batches (Level 2)
-            await human_delay()
+                duration = round(time.time() - start_time, 2)
+                rate_limited = manager.get_rate_limited_count()
+                
+                logger.info(f"✅ FOUND: {result['username']} in {duration}s")
+                
+                # Close clients in background (don't wait)
+                asyncio.create_task(manager.close_all())
+                
+                return {
+                    "status": "success",
+                    "username": result["username"],
+                    "duration": duration,
+                    "stats": stats,
+                    "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
+                }
+                
+            elif result["status"] == "taken":
+                stats["taken"] += 1
+            elif result["status"] in ["rate_limit", "challenge"]:
+                pass  # Already handled in check_username
+            else:
+                stats["errors"] += 1
         
-        # Timeout
-        rate_limited = manager.get_rate_limited_count()
-        return {
-            "status": "failed",
-            "reason": "timeout",
-            "duration": round(time.time() - start_time, 2),
-            "stats": stats,
-            "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
-        }
-        
-    finally:
-        await manager.close_all()
+        # Human-like delay between batches (Level 2)
+        await human_delay()
+    
+    # Timeout
+    rate_limited = manager.get_rate_limited_count()
+    # Close clients in background
+    asyncio.create_task(manager.close_all())
+    return {
+        "status": "failed",
+        "reason": "timeout",
+        "duration": round(time.time() - start_time, 2),
+        "stats": stats,
+        "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
+    }
 
 
 # ==========================================
@@ -457,139 +458,140 @@ async def detailed_stealth_search() -> Dict[str, Any]:
     
     batch_number = 0
     
-    try:
-        while time.time() - start_time < CONFIG["TIMEOUT"]:
-            batch_number += 1
-            batch_start = time.time()
+    while time.time() - start_time < CONFIG["TIMEOUT"]:
+        batch_number += 1
+        batch_start = time.time()
+        
+        # Get available sessions
+        available_sessions = manager.get_available_sessions()
+        rate_limited_count = manager.get_rate_limited_count()
+        
+        log_event("BATCH_START", {
+            "batch": batch_number,
+            "available_proxies": len(available_sessions),
+            "rate_limited_proxies": rate_limited_count,
+        })
+        
+        if not available_sessions:
+            log_event("ALL_RATE_LIMITED", {"waiting": 5})
+            await asyncio.sleep(5)
+            continue
+        
+        # Limit concurrent
+        sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
+        
+        # Generate usernames
+        usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
+        
+        log_event("USERNAMES_GENERATED", {
+            "count": len(usernames),
+            "samples": usernames[:5],
+        })
+        
+        # Create and track tasks
+        tasks = []
+        task_details = []
+        
+        for i, (session, username) in enumerate(zip(sessions_to_use, usernames)):
+            client = await manager.get_client(session)
             
-            # Get available sessions
-            available_sessions = manager.get_available_sessions()
-            rate_limited_count = manager.get_rate_limited_count()
-            
-            log_event("BATCH_START", {
-                "batch": batch_number,
-                "available_proxies": len(available_sessions),
-                "rate_limited_proxies": rate_limited_count,
-            })
-            
-            if not available_sessions:
-                log_event("ALL_RATE_LIMITED", {"waiting": 5})
-                await asyncio.sleep(5)
-                continue
-            
-            # Limit concurrent
-            sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
-            
-            # Generate usernames
-            usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
-            
-            log_event("USERNAMES_GENERATED", {
-                "count": len(usernames),
-                "samples": usernames[:5],
-            })
-            
-            # Create and track tasks
-            tasks = []
-            task_details = []
-            
-            for i, (session, username) in enumerate(zip(sessions_to_use, usernames)):
-                client = await manager.get_client(session)
-                
-                # Log request details
-                request_info = {
-                    "index": i,
-                    "username": username,
-                    "proxy": session.proxy_url[:40] + "...",
-                    "device": session.device["model"],
-                    "headers_sample": {
-                        "User-Agent": session.get_headers()["User-Agent"][:60] + "...",
-                        "X-IG-Device-ID": session.get_headers()["X-IG-Device-ID"][:20] + "...",
-                    }
+            # Log request details
+            request_info = {
+                "index": i,
+                "username": username,
+                "proxy": session.proxy_url[:40] + "...",
+                "device": session.device["model"],
+                "headers_sample": {
+                    "User-Agent": session.get_headers()["User-Agent"][:60] + "...",
+                    "X-IG-Device-ID": session.get_headers()["X-IG-Device-ID"][:20] + "...",
                 }
-                task_details.append(request_info)
-                detailed_log["requests_made"].append(request_info)
-                
-                tasks.append(asyncio.create_task(check_username(client, session, username)))
-            
-            log_event("REQUESTS_SENT", {"count": len(tasks)})
-            
-            # Process results
-            for coro in asyncio.as_completed(tasks):
-                result = await coro
-                stats["checked"] += 1
-                
-                response_info = {
-                    "username": result.get("username"),
-                    "status": result["status"],
-                    "response_preview": result.get("response", result.get("error", ""))[:100] if result.get("response") or result.get("error") else None,
-                }
-                detailed_log["responses_received"].append(response_info)
-                detailed_log["usernames_checked"].append(result.get("username"))
-                
-                if result["status"] == "available":
-                    for t in tasks:
-                        t.cancel()
-                    
-                    duration = round(time.time() - start_time, 4)
-                    
-                    log_event("FOUND_AVAILABLE", {
-                        "username": result["username"],
-                        "total_checked": stats["checked"],
-                        "duration": duration,
-                    })
-                    
-                    return {
-                        "status": "success",
-                        "username": result["username"],
-                        "duration": duration,
-                        "stats": stats,
-                        "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
-                        "batches_processed": batch_number,
-                        "detailed_log": detailed_log,
-                    }
-                    
-                elif result["status"] == "taken":
-                    stats["taken"] += 1
-                elif result["status"] == "rate_limit":
-                    stats["rate_limits"] += 1
-                    detailed_log["rate_limits_detected"].append(result.get("username"))
-                elif result["status"] == "timeout":
-                    stats["timeouts"] += 1
-                else:
-                    stats["errors"] += 1
-            
-            # Apply human delay
-            delay_start = time.time()
-            if random.random() < 0.1:
-                delay = random.uniform(2.0, 4.0)
-            else:
-                delay = random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
-            
-            await asyncio.sleep(delay)
-            
-            delay_info = {
-                "batch": batch_number,
-                "delay_seconds": round(delay, 3),
-                "batch_duration": round(time.time() - batch_start, 3),
             }
-            detailed_log["delays_applied"].append(delay_info)
+            task_details.append(request_info)
+            detailed_log["requests_made"].append(request_info)
             
-            log_event("BATCH_END", delay_info)
+            tasks.append(asyncio.create_task(check_username(client, session, username)))
         
-        # Timeout
-        return {
-            "status": "failed",
-            "reason": "timeout",
-            "duration": round(time.time() - start_time, 2),
-            "stats": stats,
-            "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
-            "batches_processed": batch_number,
-            "detailed_log": detailed_log,
+        log_event("REQUESTS_SENT", {"count": len(tasks)})
+        
+        # Process results
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            stats["checked"] += 1
+            
+            response_info = {
+                "username": result.get("username"),
+                "status": result["status"],
+                "response_preview": result.get("response", result.get("error", ""))[:100] if result.get("response") or result.get("error") else None,
+            }
+            detailed_log["responses_received"].append(response_info)
+            detailed_log["usernames_checked"].append(result.get("username"))
+            
+            if result["status"] == "available":
+                for t in tasks:
+                    t.cancel()
+                
+                duration = round(time.time() - start_time, 4)
+                
+                log_event("FOUND_AVAILABLE", {
+                    "username": result["username"],
+                    "total_checked": stats["checked"],
+                    "duration": duration,
+                })
+                
+                # Close clients in background (don't wait)
+                log_event("CLEANUP", {"closing_clients": len(manager.clients)})
+                asyncio.create_task(manager.close_all())
+                
+                return {
+                    "status": "success",
+                    "username": result["username"],
+                    "duration": duration,
+                    "stats": stats,
+                    "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
+                    "batches_processed": batch_number,
+                    "detailed_log": detailed_log,
+                }
+                
+            elif result["status"] == "taken":
+                stats["taken"] += 1
+            elif result["status"] == "rate_limit":
+                stats["rate_limits"] += 1
+                detailed_log["rate_limits_detected"].append(result.get("username"))
+            elif result["status"] == "timeout":
+                stats["timeouts"] += 1
+            else:
+                stats["errors"] += 1
+        
+        # Apply human delay
+        delay_start = time.time()
+        if random.random() < 0.1:
+            delay = random.uniform(2.0, 4.0)
+        else:
+            delay = random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
+        
+        await asyncio.sleep(delay)
+        
+        delay_info = {
+            "batch": batch_number,
+            "delay_seconds": round(delay, 3),
+            "batch_duration": round(time.time() - batch_start, 3),
         }
+        detailed_log["delays_applied"].append(delay_info)
         
-    finally:
-        log_event("CLEANUP", {"closing_clients": len(manager.clients)})
-        await manager.close_all()
+        log_event("BATCH_END", delay_info)
+    
+    # Timeout
+    log_event("CLEANUP", {"closing_clients": len(manager.clients)})
+    asyncio.create_task(manager.close_all())
+    return {
+        "status": "failed",
+        "reason": "timeout",
+        "duration": round(time.time() - start_time, 2),
+        "stats": stats,
+        "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
+        "batches_processed": batch_number,
+        "detailed_log": detailed_log,
+    }
 
 
 # ==========================================
