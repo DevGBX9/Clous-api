@@ -403,6 +403,196 @@ async def stealth_search() -> Dict[str, Any]:
 
 
 # ==========================================
+#     DETAILED SEARCH (FOR DEBUGGING)
+# ==========================================
+async def detailed_stealth_search() -> Dict[str, Any]:
+    """
+    Same as stealth_search but with EXTREMELY DETAILED logging.
+    Records every single step for debugging purposes.
+    """
+    start_time = time.time()
+    
+    # Detailed log for everything
+    detailed_log = {
+        "timeline": [],
+        "sessions_created": [],
+        "requests_made": [],
+        "delays_applied": [],
+        "rate_limits_detected": [],
+        "usernames_checked": [],
+        "responses_received": [],
+    }
+    
+    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0, "timeouts": 0}
+    
+    def log_event(event_type: str, data: Dict[str, Any]):
+        """Log an event with timestamp."""
+        elapsed = round(time.time() - start_time, 4)
+        detailed_log["timeline"].append({
+            "time": elapsed,
+            "event": event_type,
+            "data": data
+        })
+    
+    if not PROXIES:
+        return {"status": "failed", "reason": "no_proxies", "detailed_log": detailed_log}
+    
+    log_event("INIT", {"proxies_count": len(PROXIES), "config": CONFIG})
+    
+    # Create session manager
+    manager = ProxySessionManager(PROXIES)
+    
+    # Log all created sessions
+    for proxy_url, session in manager.sessions.items():
+        session_info = {
+            "proxy": proxy_url[:50] + "...",
+            "device": session.device["model"],
+            "ig_version": session.ig_version,
+            "device_id": session.device_id,
+            "guid": session.guid[:8] + "...",
+        }
+        detailed_log["sessions_created"].append(session_info)
+    
+    log_event("SESSIONS_CREATED", {"count": len(manager.sessions)})
+    
+    batch_number = 0
+    
+    try:
+        while time.time() - start_time < CONFIG["TIMEOUT"]:
+            batch_number += 1
+            batch_start = time.time()
+            
+            # Get available sessions
+            available_sessions = manager.get_available_sessions()
+            rate_limited_count = manager.get_rate_limited_count()
+            
+            log_event("BATCH_START", {
+                "batch": batch_number,
+                "available_proxies": len(available_sessions),
+                "rate_limited_proxies": rate_limited_count,
+            })
+            
+            if not available_sessions:
+                log_event("ALL_RATE_LIMITED", {"waiting": 5})
+                await asyncio.sleep(5)
+                continue
+            
+            # Limit concurrent
+            sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
+            
+            # Generate usernames
+            usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
+            
+            log_event("USERNAMES_GENERATED", {
+                "count": len(usernames),
+                "samples": usernames[:5],
+            })
+            
+            # Create and track tasks
+            tasks = []
+            task_details = []
+            
+            for i, (session, username) in enumerate(zip(sessions_to_use, usernames)):
+                client = await manager.get_client(session)
+                
+                # Log request details
+                request_info = {
+                    "index": i,
+                    "username": username,
+                    "proxy": session.proxy_url[:40] + "...",
+                    "device": session.device["model"],
+                    "headers_sample": {
+                        "User-Agent": session.get_headers()["User-Agent"][:60] + "...",
+                        "X-IG-Device-ID": session.get_headers()["X-IG-Device-ID"][:20] + "...",
+                    }
+                }
+                task_details.append(request_info)
+                detailed_log["requests_made"].append(request_info)
+                
+                tasks.append(asyncio.create_task(check_username(client, session, username)))
+            
+            log_event("REQUESTS_SENT", {"count": len(tasks)})
+            
+            # Process results
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
+                stats["checked"] += 1
+                
+                response_info = {
+                    "username": result.get("username"),
+                    "status": result["status"],
+                    "response_preview": result.get("response", result.get("error", ""))[:100] if result.get("response") or result.get("error") else None,
+                }
+                detailed_log["responses_received"].append(response_info)
+                detailed_log["usernames_checked"].append(result.get("username"))
+                
+                if result["status"] == "available":
+                    for t in tasks:
+                        t.cancel()
+                    
+                    duration = round(time.time() - start_time, 4)
+                    
+                    log_event("FOUND_AVAILABLE", {
+                        "username": result["username"],
+                        "total_checked": stats["checked"],
+                        "duration": duration,
+                    })
+                    
+                    return {
+                        "status": "success",
+                        "username": result["username"],
+                        "duration": duration,
+                        "stats": stats,
+                        "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
+                        "batches_processed": batch_number,
+                        "detailed_log": detailed_log,
+                    }
+                    
+                elif result["status"] == "taken":
+                    stats["taken"] += 1
+                elif result["status"] == "rate_limit":
+                    stats["rate_limits"] += 1
+                    detailed_log["rate_limits_detected"].append(result.get("username"))
+                elif result["status"] == "timeout":
+                    stats["timeouts"] += 1
+                else:
+                    stats["errors"] += 1
+            
+            # Apply human delay
+            delay_start = time.time()
+            if random.random() < 0.1:
+                delay = random.uniform(2.0, 4.0)
+            else:
+                delay = random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
+            
+            await asyncio.sleep(delay)
+            
+            delay_info = {
+                "batch": batch_number,
+                "delay_seconds": round(delay, 3),
+                "batch_duration": round(time.time() - batch_start, 3),
+            }
+            detailed_log["delays_applied"].append(delay_info)
+            
+            log_event("BATCH_END", delay_info)
+        
+        # Timeout
+        return {
+            "status": "failed",
+            "reason": "timeout",
+            "duration": round(time.time() - start_time, 2),
+            "stats": stats,
+            "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
+            "batches_processed": batch_number,
+            "detailed_log": detailed_log,
+        }
+        
+    finally:
+        log_event("CLEANUP", {"closing_clients": len(manager.clients)})
+        await manager.close_all()
+
+
+# ==========================================
 #              API ROUTES
 # ==========================================
 @app.route('/')
@@ -410,6 +600,10 @@ def home():
     return jsonify({
         "status": "online",
         "message": "Instagram Username Checker - ULTIMATE STEALTH Edition",
+        "endpoints": {
+            "/search": "Quick search - returns username only",
+            "/infosearch": "Detailed search - returns EVERYTHING"
+        },
         "features": [
             "Simple usernames (high availability)",
             "Session persistence per proxy",
@@ -425,6 +619,12 @@ def home():
 async def search():
     """Find one available username with maximum stealth."""
     result = await stealth_search()
+    return jsonify(result)
+
+@app.route('/infosearch')
+async def info_search():
+    """Find one available username with EXTREMELY DETAILED logging."""
+    result = await detailed_stealth_search()
     return jsonify(result)
 
 # ==========================================
