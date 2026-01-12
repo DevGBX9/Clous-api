@@ -106,123 +106,161 @@ app = Flask(__name__)
 CORS(app)
 
 # ==========================================
-#     PERSISTENT PROXY SESSION (Level 2)
+#     DYNAMIC IDENTITY SYSTEM (New Architecture)
 # ==========================================
+
+def generate_identity() -> Dict[str, Any]:
+    """Generate a completely NEW identity (called fresh each time)."""
+    device = random.choice(DEVICES)
+    ig_version = random.choice(IG_VERSIONS)
+    
+    # All unique IDs - fresh every time
+    device_id = f"android-{uuid4().hex[:16]}"
+    phone_id = str(uuid4())
+    guid = str(uuid4())
+    adid = str(uuid4())
+    mid = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-', k=28))
+    session_id = f"UFS-{uuid4()}-0"
+    
+    # Build User-Agent
+    user_agent = (
+        f"Instagram {ig_version} Android "
+        f"({device['android']}/{device['android']}.0; "
+        f"{device['dpi']}dpi; {device['res']}; "
+        f"{device['manufacturer']}; {device['model']}; "
+        f"{device['device']}; {device['board']}; en_{device['country']})"
+    )
+    
+    # Build headers
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': '*/*',
+        'Accept-Language': f"en-{device['country']},en;q=0.9",
+        'Accept-Encoding': 'gzip, deflate, br',
+        'User-Agent': user_agent,
+        'X-IG-App-ID': '567067343352427',
+        'X-IG-App-Locale': f"en_{device['country']}",
+        'X-IG-Device-Locale': f"en_{device['country']}",
+        'X-IG-Mapped-Locale': f"en_{device['country']}",
+        'X-IG-Device-ID': guid,
+        'X-IG-Family-Device-ID': phone_id,
+        'X-IG-Android-ID': device_id,
+        'X-IG-Timezone-Offset': str(random.choice([-18000, -14400, 0, 3600, 7200, 19800])),
+        'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G']),
+        'X-IG-Connection-Speed': f'{random.randint(1500, 4000)}kbps',
+        'X-IG-Bandwidth-Speed-KBPS': str(random.randint(3000, 12000)),
+        'X-IG-Bandwidth-TotalBytes-B': str(random.randint(2000000, 10000000)),
+        'X-IG-Bandwidth-TotalTime-MS': str(random.randint(100, 400)),
+        'X-IG-Capabilities': random.choice(['3brTvx0=', '3brTv58=', '3brTv50=']),
+        'X-IG-WWW-Claim': '0',
+        'X-Bloks-Version-Id': 'e538d4591f238824118bfcb9528c8d005f2ea3becd947a3973c030ac971bb88e',
+        'X-Bloks-Is-Layout-RTL': 'false',
+        'X-Bloks-Is-Panorama-Enabled': 'true',
+        'X-Pigeon-Session-Id': session_id,
+        'X-Pigeon-Rawclienttime': str(time.time()),
+        'X-MID': mid,
+        'X-FB-HTTP-Engine': 'Liger',
+        'X-FB-Client-IP': 'True',
+        'X-FB-Server-Cluster': 'True',
+    }
+    
+    return {
+        "device": device,
+        "device_id": device_id,
+        "phone_id": phone_id,
+        "guid": guid,
+        "headers": headers,
+    }
+
+
+# Track rate-limited proxies globally (persists across requests)
+RATE_LIMITED_PROXIES: Dict[str, float] = {}  # proxy_url -> rate_limit_until
+
+
+def is_proxy_available(proxy_url: str) -> bool:
+    """Check if proxy is not rate-limited."""
+    if proxy_url in RATE_LIMITED_PROXIES:
+        if time.time() > RATE_LIMITED_PROXIES[proxy_url]:
+            del RATE_LIMITED_PROXIES[proxy_url]
+            return True
+        return False
+    return True
+
+
+def mark_proxy_rate_limited(proxy_url: str):
+    """Mark a proxy as rate-limited."""
+    RATE_LIMITED_PROXIES[proxy_url] = time.time() + CONFIG["COOLDOWN_TIME"]
+
+
+def get_available_proxies() -> List[str]:
+    """Get all proxies that are not rate-limited."""
+    return [p for p in PROXIES if is_proxy_available(p)]
+
+
+def get_rate_limited_count() -> int:
+    """Get count of currently rate-limited proxies."""
+    # Clean up expired ones
+    now = time.time()
+    expired = [p for p, until in RATE_LIMITED_PROXIES.items() if now > until]
+    for p in expired:
+        del RATE_LIMITED_PROXIES[p]
+    return len(RATE_LIMITED_PROXIES)
+
+
 @dataclass
-class ProxySession:
-    """Persistent session for each proxy - simulates a real device."""
+class ProxyWithDualIdentity:
+    """A proxy with TWO different identities for rotation."""
     proxy_url: str
-    device: Dict[str, Any]
-    ig_version: str
-    device_id: str
-    phone_id: str
-    guid: str
-    adid: str
-    mid: str
-    session_id: str
-    last_request_time: float = 0
-    request_count: int = 0
-    is_rate_limited: bool = False
-    rate_limit_until: float = 0
+    identity1: Dict[str, Any]
+    identity2: Dict[str, Any]
+    current_identity: int = 0  # 0 or 1
     
-    def get_headers(self) -> Dict[str, str]:
-        """Get consistent headers for this session."""
-        user_agent = (
-            f"Instagram {self.ig_version} Android "
-            f"({self.device['android']}/{self.device['android']}.0; "
-            f"{self.device['dpi']}dpi; {self.device['res']}; "
-            f"{self.device['manufacturer']}; {self.device['model']}; "
-            f"{self.device['device']}; {self.device['board']}; en_{self.device['country']})"
-        )
-        
-        return {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Accept': '*/*',
-            'Accept-Language': f"en-{self.device['country']},en;q=0.9",
-            'Accept-Encoding': 'gzip, deflate, br',
-            'User-Agent': user_agent,
-            'X-IG-App-ID': '567067343352427',
-            'X-IG-App-Locale': f"en_{self.device['country']}",
-            'X-IG-Device-Locale': f"en_{self.device['country']}",
-            'X-IG-Mapped-Locale': f"en_{self.device['country']}",
-            'X-IG-Device-ID': self.guid,
-            'X-IG-Family-Device-ID': self.phone_id,
-            'X-IG-Android-ID': self.device_id,
-            'X-IG-Timezone-Offset': str(random.choice([-18000, -14400, 0, 3600, 7200, 19800])),
-            'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G']),
-            'X-IG-Connection-Speed': f'{random.randint(1500, 4000)}kbps',
-            'X-IG-Bandwidth-Speed-KBPS': str(random.randint(3000, 12000)),
-            'X-IG-Bandwidth-TotalBytes-B': str(random.randint(2000000, 10000000)),
-            'X-IG-Bandwidth-TotalTime-MS': str(random.randint(100, 400)),
-            'X-IG-Capabilities': random.choice(['3brTvx0=', '3brTv58=', '3brTv50=']),
-            'X-IG-WWW-Claim': '0',
-            'X-Bloks-Version-Id': 'e538d4591f238824118bfcb9528c8d005f2ea3becd947a3973c030ac971bb88e',
-            'X-Bloks-Is-Layout-RTL': 'false',
-            'X-Bloks-Is-Panorama-Enabled': 'true',
-            'X-Pigeon-Session-Id': self.session_id,
-            'X-Pigeon-Rawclienttime': str(time.time()),
-            'X-MID': self.mid,
-            'X-FB-HTTP-Engine': 'Liger',
-            'X-FB-Client-IP': 'True',
-            'X-FB-Server-Cluster': 'True',
-        }
+    def get_current_identity(self) -> Dict[str, Any]:
+        """Get the current identity."""
+        return self.identity1 if self.current_identity == 0 else self.identity2
     
-    def can_make_request(self) -> bool:
-        """Check if this proxy can make a request now."""
-        if self.is_rate_limited:
-            if time.time() > self.rate_limit_until:
-                self.is_rate_limited = False
-            else:
-                return False
-        return True
-    
-    def mark_rate_limited(self):
-        """Mark this proxy as rate-limited."""
-        self.is_rate_limited = True
-        self.rate_limit_until = time.time() + CONFIG["COOLDOWN_TIME"]
+    def rotate(self):
+        """Switch to the other identity."""
+        self.current_identity = 1 - self.current_identity
 
 
-class ProxySessionManager:
-    """Manages persistent sessions for all proxies."""
+class DynamicSessionManager:
+    """
+    Creates FRESH identities for each /search request.
+    Each proxy gets 2 identities for rotation.
+    """
     
     def __init__(self, proxies: List[str]):
-        self.sessions: Dict[str, ProxySession] = {}
+        self.proxies_with_identities: List[ProxyWithDualIdentity] = []
         self.clients: Dict[str, httpx.AsyncClient] = {}
-        self._create_sessions(proxies)
+        self._setup(proxies)
     
-    def _create_sessions(self, proxies: List[str]):
-        """Create persistent sessions for each proxy."""
-        for proxy in proxies:
-            device = random.choice(DEVICES)
-            self.sessions[proxy] = ProxySession(
-                proxy_url=proxy,
-                device=device,
-                ig_version=random.choice(IG_VERSIONS),
-                device_id=f"android-{uuid4().hex[:16]}",
-                phone_id=str(uuid4()),
-                guid=str(uuid4()),
-                adid=str(uuid4()),
-                mid=''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-', k=28)),
-                session_id=f"UFS-{uuid4()}-0",
-            )
-        logger.info(f"Created {len(self.sessions)} persistent proxy sessions")
+    def _setup(self, proxies: List[str]):
+        """Setup proxies with fresh dual identities."""
+        available = [p for p in proxies if is_proxy_available(p)]
+        
+        for proxy_url in available:
+            # Each proxy gets 2 DIFFERENT fresh identities
+            self.proxies_with_identities.append(ProxyWithDualIdentity(
+                proxy_url=proxy_url,
+                identity1=generate_identity(),
+                identity2=generate_identity(),
+            ))
+        
+        logger.info(f"🔄 Created {len(self.proxies_with_identities)} proxies with dual identities (fresh!)")
     
-    def get_available_sessions(self) -> List[ProxySession]:
-        """Get all sessions that are not rate-limited."""
-        return [s for s in self.sessions.values() if s.can_make_request()]
+    def get_available_proxies(self) -> List[ProxyWithDualIdentity]:
+        """Get all proxies (already filtered during setup)."""
+        return self.proxies_with_identities
     
-    def get_rate_limited_count(self) -> int:
-        """Get count of rate-limited proxies."""
-        return sum(1 for s in self.sessions.values() if s.is_rate_limited)
-    
-    async def get_client(self, session: ProxySession) -> httpx.AsyncClient:
-        """Get or create client for a session."""
-        if session.proxy_url not in self.clients:
-            self.clients[session.proxy_url] = httpx.AsyncClient(
-                proxy=session.proxy_url,
+    async def get_client(self, proxy_url: str) -> httpx.AsyncClient:
+        """Get or create client for a proxy."""
+        if proxy_url not in self.clients:
+            self.clients[proxy_url] = httpx.AsyncClient(
+                proxy=proxy_url,
                 timeout=CONFIG["REQUEST_TIMEOUT"]
             )
-        return self.clients[session.proxy_url]
+        return self.clients[proxy_url]
     
     async def close_all(self):
         """Close all clients."""
@@ -265,44 +303,47 @@ def generate_simple_username() -> str:
 
 
 # ==========================================
-#     CORE: CHECK USERNAME
+#     CORE: CHECK USERNAME (New System)
 # ==========================================
 async def check_username(
     client: httpx.AsyncClient,
-    session: ProxySession,
+    proxy_with_id: ProxyWithDualIdentity,
     username: str
 ) -> Dict[str, Any]:
-    """Check a single username with full stealth."""
+    """Check a single username with dynamic identity."""
     try:
         # Simulate typing the username
         await simulate_typing_delay(username)
         
+        # Get current identity
+        identity = proxy_with_id.get_current_identity()
+        
         data = {
             "username": username,
-            "_uuid": session.guid,
+            "_uuid": identity["guid"],
         }
         
         response = await client.post(
             CONFIG["API_URL"],
-            headers=session.get_headers(),
+            headers=identity["headers"],
             data=data
         )
         
-        session.request_count += 1
-        session.last_request_time = time.time()
+        # Rotate to other identity for next request
+        proxy_with_id.rotate()
         
         text = response.text
         
         if '"available":true' in text or '"available": true' in text:
-            return {"status": "available", "username": username}
+            return {"status": "available", "username": username, "proxy": proxy_with_id.proxy_url}
         elif '"available":false' in text or '"available": false' in text:
-            return {"status": "taken", "username": username}
+            return {"status": "taken", "username": username, "proxy": proxy_with_id.proxy_url}
         elif 'wait a few minutes' in text.lower() or 'rate_limit' in text.lower():
-            session.mark_rate_limited()
-            return {"status": "rate_limit", "username": username}
+            mark_proxy_rate_limited(proxy_with_id.proxy_url)
+            return {"status": "rate_limit", "username": username, "proxy": proxy_with_id.proxy_url}
         elif 'challenge_required' in text.lower():
-            session.mark_rate_limited()
-            return {"status": "challenge", "username": username}
+            mark_proxy_rate_limited(proxy_with_id.proxy_url)
+            return {"status": "challenge", "username": username, "proxy": proxy_with_id.proxy_url}
         else:
             return {"status": "error", "username": username, "response": text[:100]}
             
@@ -313,46 +354,54 @@ async def check_username(
 
 
 # ==========================================
-#     SMART SEARCH WITH ALL STEALTH LEVELS
+#     SMART SEARCH WITH DYNAMIC IDENTITIES
 # ==========================================
 async def stealth_search() -> Dict[str, Any]:
     """
-    Search with MAXIMUM STEALTH:
-    - Level 1: Simple usernames, random delays
-    - Level 2: Session persistence, human-like timing
-    - Level 3: Smart proxy rotation, rate limit handling
+    Search with DYNAMIC IDENTITIES:
+    - Fresh identities generated for EACH /search request
+    - Each proxy gets 2 identities for rotation
+    - Rate-limited proxies are skipped automatically
     """
     start_time = time.time()
-    stats = {"checked": 0, "taken": 0, "errors": 0}
+    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0}
     
     if not PROXIES:
         return {"status": "failed", "reason": "no_proxies", "duration": 0}
     
-    # Create session manager (Level 2: Session Persistence)
-    manager = ProxySessionManager(PROXIES)
+    # Create FRESH session manager with NEW identities
+    manager = DynamicSessionManager(PROXIES)
+    available_proxies = manager.get_available_proxies()
     
-    logger.info(f"🛡️ Starting STEALTH search with {len(PROXIES)} proxy sessions...")
+    if not available_proxies:
+        return {
+            "status": "failed", 
+            "reason": "all_proxies_rate_limited", 
+            "duration": 0,
+            "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
+        }
+    
+    logger.info(f"� Starting search with {len(available_proxies)} proxies (fresh dual identities!)")
     
     while time.time() - start_time < CONFIG["TIMEOUT"]:
-        # Get available (non-rate-limited) sessions
-        available_sessions = manager.get_available_sessions()
+        # Limit concurrent requests
+        proxies_to_use = available_proxies[:CONFIG["MAX_CONCURRENT"]]
         
-        if not available_sessions:
-            logger.warning("All proxies rate-limited! Waiting for cooldown...")
+        if not proxies_to_use:
+            logger.warning("No available proxies! Waiting...")
             await asyncio.sleep(5)
+            # Refresh available proxies
+            available_proxies = [p for p in manager.proxies_with_identities if is_proxy_available(p.proxy_url)]
             continue
         
-        # Limit concurrent requests (Level 1)
-        sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
-        
         # Generate usernames
-        usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
+        usernames = [generate_simple_username() for _ in range(len(proxies_to_use))]
         
         # Create tasks
         tasks = []
-        for session, username in zip(sessions_to_use, usernames):
-            client = await manager.get_client(session)
-            tasks.append(asyncio.create_task(check_username(client, session, username)))
+        for proxy_with_id, username in zip(proxies_to_use, usernames):
+            client = await manager.get_client(proxy_with_id.proxy_url)
+            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
         
         # Process results as they come in
         for coro in asyncio.as_completed(tasks):
@@ -365,7 +414,6 @@ async def stealth_search() -> Dict[str, Any]:
                     t.cancel()
                 
                 duration = round(time.time() - start_time, 2)
-                rate_limited = manager.get_rate_limited_count()
                 
                 logger.info(f"✅ FOUND: {result['username']} in {duration}s")
                 
@@ -377,21 +425,20 @@ async def stealth_search() -> Dict[str, Any]:
                     "username": result["username"],
                     "duration": duration,
                     "stats": stats,
-                    "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
+                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
                 }
                 
             elif result["status"] == "taken":
                 stats["taken"] += 1
             elif result["status"] in ["rate_limit", "challenge"]:
-                pass  # Already handled in check_username
+                stats["rate_limits"] += 1
             else:
                 stats["errors"] += 1
         
-        # Human-like delay between batches (Level 2)
+        # Human-like delay between batches
         await human_delay()
     
     # Timeout
-    rate_limited = manager.get_rate_limited_count()
     # Close clients in background
     asyncio.create_task(manager.close_all())
     return {
@@ -399,7 +446,7 @@ async def stealth_search() -> Dict[str, Any]:
         "reason": "timeout",
         "duration": round(time.time() - start_time, 2),
         "stats": stats,
-        "rate_limited_proxies": f"{rate_limited}/{len(PROXIES)}"
+        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
     }
 
 
@@ -409,14 +456,14 @@ async def stealth_search() -> Dict[str, Any]:
 async def detailed_stealth_search() -> Dict[str, Any]:
     """
     Same as stealth_search but with EXTREMELY DETAILED logging.
-    Records every single step for debugging purposes.
+    Uses the new DYNAMIC IDENTITY system.
     """
     start_time = time.time()
     
     # Detailed log for everything
     detailed_log = {
         "timeline": [],
-        "sessions_created": [],
+        "identities_created": [],
         "requests_made": [],
         "delays_applied": [],
         "rate_limits_detected": [],
@@ -440,21 +487,33 @@ async def detailed_stealth_search() -> Dict[str, Any]:
     
     log_event("INIT", {"proxies_count": len(PROXIES), "config": CONFIG})
     
-    # Create session manager
-    manager = ProxySessionManager(PROXIES)
+    # Create FRESH session manager with NEW identities
+    manager = DynamicSessionManager(PROXIES)
+    available_proxies = manager.get_available_proxies()
     
-    # Log all created sessions
-    for proxy_url, session in manager.sessions.items():
-        session_info = {
-            "proxy": proxy_url[:50] + "...",
-            "device": session.device["model"],
-            "ig_version": session.ig_version,
-            "device_id": session.device_id,
-            "guid": session.guid[:8] + "...",
+    # Log all created identities
+    for proxy_with_id in available_proxies:
+        identity1 = proxy_with_id.identity1
+        identity2 = proxy_with_id.identity2
+        identity_info = {
+            "proxy": proxy_with_id.proxy_url[:50] + "...",
+            "identity1": {
+                "device": identity1["device"]["model"],
+                "device_id": identity1["device_id"],
+                "guid": identity1["guid"][:12] + "...",
+            },
+            "identity2": {
+                "device": identity2["device"]["model"],
+                "device_id": identity2["device_id"],
+                "guid": identity2["guid"][:12] + "...",
+            },
         }
-        detailed_log["sessions_created"].append(session_info)
+        detailed_log["identities_created"].append(identity_info)
     
-    log_event("SESSIONS_CREATED", {"count": len(manager.sessions)})
+    log_event("IDENTITIES_CREATED", {
+        "count": len(available_proxies),
+        "total_identities": len(available_proxies) * 2,
+    })
     
     batch_number = 0
     
@@ -462,26 +521,25 @@ async def detailed_stealth_search() -> Dict[str, Any]:
         batch_number += 1
         batch_start = time.time()
         
-        # Get available sessions
-        available_sessions = manager.get_available_sessions()
-        rate_limited_count = manager.get_rate_limited_count()
+        # Get available proxies
+        current_available = [p for p in available_proxies if is_proxy_available(p.proxy_url)]
         
         log_event("BATCH_START", {
             "batch": batch_number,
-            "available_proxies": len(available_sessions),
-            "rate_limited_proxies": rate_limited_count,
+            "available_proxies": len(current_available),
+            "rate_limited_proxies": get_rate_limited_count(),
         })
         
-        if not available_sessions:
+        if not current_available:
             log_event("ALL_RATE_LIMITED", {"waiting": 5})
             await asyncio.sleep(5)
             continue
         
         # Limit concurrent
-        sessions_to_use = available_sessions[:CONFIG["MAX_CONCURRENT"]]
+        proxies_to_use = current_available[:CONFIG["MAX_CONCURRENT"]]
         
         # Generate usernames
-        usernames = [generate_simple_username() for _ in range(len(sessions_to_use))]
+        usernames = [generate_simple_username() for _ in range(len(proxies_to_use))]
         
         log_event("USERNAMES_GENERATED", {
             "count": len(usernames),
@@ -490,26 +548,26 @@ async def detailed_stealth_search() -> Dict[str, Any]:
         
         # Create and track tasks
         tasks = []
-        task_details = []
         
-        for i, (session, username) in enumerate(zip(sessions_to_use, usernames)):
-            client = await manager.get_client(session)
+        for i, (proxy_with_id, username) in enumerate(zip(proxies_to_use, usernames)):
+            client = await manager.get_client(proxy_with_id.proxy_url)
+            identity = proxy_with_id.get_current_identity()
             
             # Log request details
             request_info = {
                 "index": i,
                 "username": username,
-                "proxy": session.proxy_url[:40] + "...",
-                "device": session.device["model"],
+                "proxy": proxy_with_id.proxy_url[:40] + "...",
+                "device": identity["device"]["model"],
+                "identity_num": proxy_with_id.current_identity + 1,
                 "headers_sample": {
-                    "User-Agent": session.get_headers()["User-Agent"][:60] + "...",
-                    "X-IG-Device-ID": session.get_headers()["X-IG-Device-ID"][:20] + "...",
+                    "User-Agent": identity["headers"]["User-Agent"][:60] + "...",
+                    "X-IG-Device-ID": identity["headers"]["X-IG-Device-ID"][:20] + "...",
                 }
             }
-            task_details.append(request_info)
             detailed_log["requests_made"].append(request_info)
             
-            tasks.append(asyncio.create_task(check_username(client, session, username)))
+            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
         
         log_event("REQUESTS_SENT", {"count": len(tasks)})
         
@@ -547,7 +605,7 @@ async def detailed_stealth_search() -> Dict[str, Any]:
                     "username": result["username"],
                     "duration": duration,
                     "stats": stats,
-                    "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
+                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
                     "batches_processed": batch_number,
                     "detailed_log": detailed_log,
                 }
@@ -563,7 +621,6 @@ async def detailed_stealth_search() -> Dict[str, Any]:
                 stats["errors"] += 1
         
         # Apply human delay
-        delay_start = time.time()
         if random.random() < 0.1:
             delay = random.uniform(2.0, 4.0)
         else:
@@ -588,7 +645,7 @@ async def detailed_stealth_search() -> Dict[str, Any]:
         "reason": "timeout",
         "duration": round(time.time() - start_time, 2),
         "stats": stats,
-        "rate_limited_proxies": f"{manager.get_rate_limited_count()}/{len(PROXIES)}",
+        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
         "batches_processed": batch_number,
         "detailed_log": detailed_log,
     }
