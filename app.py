@@ -1207,8 +1207,17 @@ async def warm():
 
 @app.route('/search')
 async def search():
-    """Find one available username with maximum stealth."""
-    result = await stealth_search()
+    """
+    Find one available username with maximum stealth.
+    Smart Probability: 70% Simple Search (5 chars), 30% Pro Search (Semi-Quad).
+    """
+    if random.random() < 0.7:
+        # 70% chance: Simple Search (stealth_search)
+        result = await stealth_search()
+    else:
+        # 30% chance: Pro Search (semi_quad_stealth_search)
+        result = await semi_quad_stealth_search()
+    
     return jsonify(result)
 
 @app.route('/infosearch')
