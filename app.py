@@ -423,6 +423,53 @@ def generate_simple_username() -> str:
     return random.choice(LETTERS) + ''.join(random.choices(CHARS, k=4))
 
 
+def generate_semi_quad_username() -> str:
+    """
+    Generate a semi-quad username (5 chars with _ or . in allowed positions).
+    Rules:
+    - Must start with a letter (a-z)
+    - Must contain at least one _ or . 
+    - Symbols can be in positions 1, 2, or 3 ONLY (0-indexed: index 1, 2, 3)
+    - Cannot start or end with . (underscore at end is allowed by Instagram)
+    - No consecutive . or adjacent ._/_.  
+    """
+    max_attempts = 100
+    
+    for _ in range(max_attempts):
+        # Start with a letter
+        first_char = random.choice(LETTERS)
+        
+        # Choose symbol and position (positions 1, 2, or 3 for a 5-char username)
+        symbol = random.choice('._')
+        symbol_pos = random.choice([1, 2, 3])  # Position index in 5-char string
+        
+        # Build the username
+        username_chars = [first_char]
+        for pos in range(1, 5):
+            if pos == symbol_pos:
+                username_chars.append(symbol)
+            else:
+                username_chars.append(random.choice(CHARS))
+        
+        username = ''.join(username_chars)
+        
+        # Validate Instagram rules
+        # Rule 1: Cannot end with .
+        if username.endswith('.'):
+            continue
+        # Rule 2: No consecutive dots
+        if '..' in username:
+            continue
+        # Rule 3: No ._ or _. adjacent
+        if '._' in username or '_.' in username:
+            continue
+        
+        return username
+    
+    # Fallback: guaranteed valid
+    return random.choice(LETTERS) + '_' + ''.join(random.choices(CHARS, k=2)) + random.choice(CHARS)
+
+
 # ==========================================
 #     CORE: CHECK USERNAME (New System)
 # ==========================================
@@ -552,6 +599,104 @@ async def stealth_search() -> Dict[str, Any]:
                 return {
                     "status": "success",
                     "username": result["username"],
+                    "duration": duration,
+                    "stats": stats,
+                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+                    "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
+                }
+                
+            elif result["status"] == "taken":
+                stats["taken"] += 1
+            elif result["status"] in ["rate_limit", "challenge"]:
+                stats["rate_limits"] += 1
+            else:
+                stats["errors"] += 1
+        
+        # Human-like delay between batches
+        await human_delay()
+    
+    # Timeout
+    # Close clients in background
+    asyncio.create_task(manager.close_all())
+    return {
+        "status": "failed",
+        "reason": "timeout",
+        "duration": round(time.time() - start_time, 2),
+        "stats": stats,
+        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+        "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
+    }
+
+
+# ==========================================
+#     SEMI-QUAD SEARCH (FOR /prosearch)
+# ==========================================
+async def semi_quad_stealth_search() -> Dict[str, Any]:
+    """
+    Search for SEMI-QUAD usernames only (with _ or . in allowed positions).
+    Same stealth features as stealth_search but uses semi-quad generator.
+    """
+    start_time = time.time()
+    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0}
+    
+    if not PROXIES:
+        return {"status": "failed", "reason": "no_proxies", "duration": 0}
+    
+    # Create FRESH session manager with NEW identities
+    manager = DynamicSessionManager(PROXIES)
+    available_proxies = manager.get_available_proxies()
+    
+    if not available_proxies:
+        return {
+            "status": "failed", 
+            "reason": "all_proxies_rate_limited", 
+            "duration": 0,
+            "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
+        }
+    
+    logger.info(f"🔍 Starting SEMI-QUAD search with {len(available_proxies)} proxies")
+    
+    while time.time() - start_time < CONFIG["TIMEOUT"]:
+        # Limit concurrent requests
+        proxies_to_use = available_proxies[:CONFIG["MAX_CONCURRENT"]]
+        
+        if not proxies_to_use:
+            logger.warning("No available proxies! Waiting...")
+            await asyncio.sleep(5)
+            # Refresh available proxies
+            available_proxies = [p for p in manager.proxies_with_identities if is_proxy_available(p.proxy_url)]
+            continue
+        
+        # Generate SEMI-QUAD usernames (with _ or .)
+        usernames = [generate_semi_quad_username() for _ in range(len(proxies_to_use))]
+        
+        # Create tasks
+        tasks = []
+        for proxy_with_id, username in zip(proxies_to_use, usernames):
+            client = await manager.get_client(proxy_with_id.proxy_url)
+            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
+        
+        # Process results as they come in
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            stats["checked"] += 1
+            
+            if result["status"] == "available":
+                # Found! Cancel remaining and return
+                for t in tasks:
+                    t.cancel()
+                
+                duration = round(time.time() - start_time, 2)
+                
+                logger.info(f"✅ FOUND SEMI-QUAD: {result['username']} in {duration}s")
+                
+                # Close clients in background (don't wait)
+                asyncio.create_task(manager.close_all())
+                
+                return {
+                    "status": "success",
+                    "username": result["username"],
+                    "type": "semi-quad",
                     "duration": duration,
                     "stats": stats,
                     "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
@@ -787,6 +932,216 @@ async def detailed_stealth_search() -> Dict[str, Any]:
 
 
 # ==========================================
+#     DETAILED SEMI-QUAD SEARCH (FOR /infoprosearch)
+# ==========================================
+async def detailed_semi_quad_stealth_search() -> Dict[str, Any]:
+    """
+    Same as detailed_stealth_search but for SEMI-QUAD usernames.
+    Uses generate_semi_quad_username instead of generate_simple_username.
+    """
+    start_time = time.time()
+    
+    # Detailed log for everything
+    detailed_log = {
+        "timeline": [],
+        "identities_created": [],
+        "requests_made": [],
+        "delays_applied": [],
+        "rate_limits_detected": [],
+        "usernames_checked": [],
+        "responses_received": [],
+    }
+    
+    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0, "timeouts": 0}
+    
+    def log_event(event_type: str, data: Dict[str, Any]):
+        """Log an event with timestamp."""
+        elapsed = round(time.time() - start_time, 4)
+        detailed_log["timeline"].append({
+            "time": elapsed,
+            "event": event_type,
+            "data": data
+        })
+    
+    if not PROXIES:
+        return {"status": "failed", "reason": "no_proxies", "detailed_log": detailed_log}
+    
+    log_event("INIT", {
+        "proxies_count": len(PROXIES), 
+        "warm_sessions": get_warm_count(),
+        "config": CONFIG,
+        "search_type": "SEMI-QUAD"
+    })
+    
+    # Create FRESH session manager with NEW identities
+    manager = DynamicSessionManager(PROXIES)
+    available_proxies = manager.get_available_proxies()
+    
+    # Log all created identities
+    for proxy_with_id in available_proxies:
+        identity1 = proxy_with_id.identity1
+        identity2 = proxy_with_id.identity2
+        identity_info = {
+            "proxy": proxy_with_id.proxy_url[:50] + "...",
+            "identity1": {
+                "device": identity1["device"]["model"],
+                "device_id": identity1["device_id"],
+                "guid": identity1["guid"][:12] + "...",
+            },
+            "identity2": {
+                "device": identity2["device"]["model"],
+                "device_id": identity2["device_id"],
+                "guid": identity2["guid"][:12] + "...",
+            },
+        }
+        detailed_log["identities_created"].append(identity_info)
+    
+    log_event("IDENTITIES_CREATED", {
+        "count": len(available_proxies),
+        "total_identities": len(available_proxies) * 2,
+    })
+    
+    batch_number = 0
+    
+    while time.time() - start_time < CONFIG["TIMEOUT"]:
+        batch_number += 1
+        batch_start = time.time()
+        
+        # Get available proxies
+        current_available = [p for p in available_proxies if is_proxy_available(p.proxy_url)]
+        
+        log_event("BATCH_START", {
+            "batch": batch_number,
+            "available_proxies": len(current_available),
+            "rate_limited_proxies": get_rate_limited_count(),
+        })
+        
+        if not current_available:
+            log_event("ALL_RATE_LIMITED", {"waiting": 5})
+            await asyncio.sleep(5)
+            continue
+        
+        # Limit concurrent
+        proxies_to_use = current_available[:CONFIG["MAX_CONCURRENT"]]
+        
+        # Generate SEMI-QUAD usernames
+        usernames = [generate_semi_quad_username() for _ in range(len(proxies_to_use))]
+        
+        log_event("USERNAMES_GENERATED", {
+            "count": len(usernames),
+            "samples": usernames[:5],
+            "type": "semi-quad"
+        })
+        
+        # Create and track tasks
+        tasks = []
+        
+        for i, (proxy_with_id, username) in enumerate(zip(proxies_to_use, usernames)):
+            client = await manager.get_client(proxy_with_id.proxy_url)
+            identity = proxy_with_id.get_current_identity()
+            
+            # Log request details
+            request_info = {
+                "index": i,
+                "username": username,
+                "proxy": proxy_with_id.proxy_url[:40] + "...",
+                "device": identity["device"]["model"],
+                "identity_num": proxy_with_id.current_identity + 1,
+                "headers_sample": {
+                    "User-Agent": identity["headers"]["User-Agent"][:60] + "...",
+                    "X-IG-Device-ID": identity["headers"]["X-IG-Device-ID"][:20] + "...",
+                }
+            }
+            detailed_log["requests_made"].append(request_info)
+            
+            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
+        
+        log_event("REQUESTS_SENT", {"count": len(tasks)})
+        
+        # Process results
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            stats["checked"] += 1
+            
+            response_info = {
+                "username": result.get("username"),
+                "status": result["status"],
+                "response_preview": result.get("response", result.get("error", ""))[:100] if result.get("response") or result.get("error") else None,
+            }
+            detailed_log["responses_received"].append(response_info)
+            detailed_log["usernames_checked"].append(result.get("username"))
+            
+            if result["status"] == "available":
+                for t in tasks:
+                    t.cancel()
+                
+                duration = round(time.time() - start_time, 4)
+                
+                log_event("FOUND_AVAILABLE", {
+                    "username": result["username"],
+                    "total_checked": stats["checked"],
+                    "duration": duration,
+                    "type": "semi-quad"
+                })
+                
+                # Close clients in background (don't wait)
+                log_event("CLEANUP", {"closing_clients": len(manager.clients)})
+                asyncio.create_task(manager.close_all())
+                
+                return {
+                    "status": "success",
+                    "username": result["username"],
+                    "type": "semi-quad",
+                    "duration": duration,
+                    "stats": stats,
+                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+                    "batches_processed": batch_number,
+                    "detailed_log": detailed_log,
+                }
+                
+            elif result["status"] == "taken":
+                stats["taken"] += 1
+            elif result["status"] == "rate_limit":
+                stats["rate_limits"] += 1
+                detailed_log["rate_limits_detected"].append(result.get("username"))
+            elif result["status"] == "timeout":
+                stats["timeouts"] += 1
+            else:
+                stats["errors"] += 1
+        
+        # Apply human delay
+        if random.random() < 0.1:
+            delay = random.uniform(2.0, 4.0)
+        else:
+            delay = random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
+        
+        await asyncio.sleep(delay)
+        
+        delay_info = {
+            "batch": batch_number,
+            "delay_seconds": round(delay, 3),
+            "batch_duration": round(time.time() - batch_start, 3),
+        }
+        detailed_log["delays_applied"].append(delay_info)
+        
+        log_event("BATCH_END", delay_info)
+    
+    # Timeout
+    log_event("CLEANUP", {"closing_clients": len(manager.clients)})
+    asyncio.create_task(manager.close_all())
+    return {
+        "status": "failed",
+        "reason": "timeout",
+        "type": "semi-quad",
+        "duration": round(time.time() - start_time, 2),
+        "stats": stats,
+        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+        "batches_processed": batch_number,
+        "detailed_log": detailed_log,
+    }
+
+
+# ==========================================
 #              API ROUTES
 # ==========================================
 @app.route('/')
@@ -795,8 +1150,10 @@ def home():
         "status": "online",
         "message": "Instagram Username Checker - ULTIMATE STEALTH Edition",
         "endpoints": {
-            "/search": "Quick search - returns username only",
+            "/search": "Quick search - returns simple 5-char username",
+            "/prosearch": "Semi-quad search - returns username with _ or . (e.g. a_bcd, ab.cd)",
             "/infosearch": "Detailed search - returns EVERYTHING",
+            "/infoprosearch": "Detailed semi-quad search - returns EVERYTHING for semi-quad",
             "/warm": "Pre-warm all proxy sessions",
             "/status": "Get current status"
         },
@@ -855,6 +1212,20 @@ async def search():
 async def info_search():
     """Find one available username with EXTREMELY DETAILED logging."""
     result = await detailed_stealth_search()
+    return jsonify(result)
+
+
+@app.route('/prosearch')
+async def pro_search():
+    """Find one available SEMI-QUAD username (with _ or . in allowed positions)."""
+    result = await semi_quad_stealth_search()
+    return jsonify(result)
+
+
+@app.route('/infoprosearch')
+async def info_pro_search():
+    """Find one available SEMI-QUAD username with EXTREMELY DETAILED logging."""
+    result = await detailed_semi_quad_stealth_search()
     return jsonify(result)
 
 # ==========================================
