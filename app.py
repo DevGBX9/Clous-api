@@ -629,15 +629,19 @@ async def stealth_search() -> Dict[str, Any]:
 
 
 # ==========================================
-#     SEMI-QUAD SEARCH (FOR /prosearch)
+#     SEMI-QUAD SEARCH (FOR /prosearch) - FAST MODE
 # ==========================================
 async def semi_quad_stealth_search() -> Dict[str, Any]:
     """
-    Search for SEMI-QUAD usernames only (with _ or . in allowed positions).
-    Same stealth features as stealth_search but uses semi-quad generator.
+    FAST Search for SEMI-QUAD usernames only.
+    NO DELAYS - Maximum speed for quick results.
     """
     start_time = time.time()
     stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0}
+    
+    # FAST MODE CONFIG
+    FAST_MAX_CONCURRENT = 50  # Use more proxies at once
+    FAST_TIMEOUT = 30  # Max 30 seconds
     
     if not PROXIES:
         return {"status": "failed", "reason": "no_proxies", "duration": 0}
@@ -654,15 +658,15 @@ async def semi_quad_stealth_search() -> Dict[str, Any]:
             "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
         }
     
-    logger.info(f"🔍 Starting SEMI-QUAD search with {len(available_proxies)} proxies")
+    logger.info(f"� Starting FAST SEMI-QUAD search with {len(available_proxies)} proxies")
     
-    while time.time() - start_time < CONFIG["TIMEOUT"]:
-        # Limit concurrent requests
-        proxies_to_use = available_proxies[:CONFIG["MAX_CONCURRENT"]]
+    while time.time() - start_time < FAST_TIMEOUT:
+        # Use MORE proxies at once for speed
+        proxies_to_use = available_proxies[:FAST_MAX_CONCURRENT]
         
         if not proxies_to_use:
             logger.warning("No available proxies! Waiting...")
-            await asyncio.sleep(5)
+            await asyncio.sleep(2)  # Shorter wait
             # Refresh available proxies
             available_proxies = [p for p in manager.proxies_with_identities if is_proxy_available(p.proxy_url)]
             continue
@@ -710,8 +714,7 @@ async def semi_quad_stealth_search() -> Dict[str, Any]:
             else:
                 stats["errors"] += 1
         
-        # Human-like delay between batches
-        await human_delay()
+        # NO DELAY - Go immediately to next batch for maximum speed!
     
     # Timeout
     # Close clients in background
