@@ -138,7 +138,13 @@ PROXIES = load_proxies()
 #              FLASK APP
 # ==========================================
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # ==========================================
 #     DYNAMIC IDENTITY SYSTEM (New Architecture)
@@ -318,7 +324,21 @@ def get_proxy_stats() -> Dict[str, Any]:
         "resting": get_resting_count(),
         "total_requests": total_requests,
         "success_rate": f"{(total_success / (total_success + total_fails) * 100):.1f}%" if (total_success + total_fails) > 0 else "0%",
+        "warm_count": get_warm_count(),
     }
+
+
+# ==========================================
+#     DASHBOARD ROUTES
+# ==========================================
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html')
+
+
+@app.route('/api/stats')
+def api_stats():
+    return jsonify(get_proxy_stats())
 
 
 @dataclass
