@@ -328,14 +328,6 @@ def get_proxy_stats() -> Dict[str, Any]:
     }
 
 
-# ==========================================
-#     DASHBOARD ROUTES
-# ==========================================
-@app.route('/dashboard')
-def dashboard():
-    return render_template('dashboard.html')
-
-
 @app.route('/api/stats')
 def api_stats():
     return jsonify(get_proxy_stats())
