@@ -1,0 +1,1726 @@
+{
+  "batches_processed": 1,
+  "detailed_log": {
+    "delays_applied": [],
+    "identities_created": [
+      {
+        "identity1": {
+          "device": "CPH2451",
+          "device_id": "android-2ebab369e3f7475b",
+          "guid": "f67a52d2-558..."
+        },
+        "identity2": {
+          "device": "2201116SG",
+          "device_id": "android-1e31f48b27c04ae6",
+          "guid": "2acabd69-b52..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6a",
+          "device_id": "android-7803b1658a9b4259",
+          "guid": "64e96f52-b3e..."
+        },
+        "identity2": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-9ae6d945edde4374",
+          "guid": "7292ce1c-4a2..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-d8bff40ac26143b0",
+          "guid": "dc48fb74-00e..."
+        },
+        "identity2": {
+          "device": "moto g84 5G",
+          "device_id": "android-bf05e77545c548a0",
+          "guid": "b406a24e-5f9..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-0224a6ba66024bfd",
+          "guid": "3e78c894-993..."
+        },
+        "identity2": {
+          "device": "CPH2449",
+          "device_id": "android-79f41878eec9413b",
+          "guid": "c9d3b703-1b0..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-baed169012384f39",
+          "guid": "2473bb2b-b13..."
+        },
+        "identity2": {
+          "device": "2211133C",
+          "device_id": "android-46597aa40012450b",
+          "guid": "b0e392a5-5fc..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2413",
+          "device_id": "android-b18929821a4d4cf1",
+          "guid": "47871a9f-e84..."
+        },
+        "identity2": {
+          "device": "2201116SG",
+          "device_id": "android-f2470580cc1f41bb",
+          "guid": "704766d0-0c7..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3706",
+          "device_id": "android-4f59418b26b54fc3",
+          "guid": "2ba4d741-7e5..."
+        },
+        "identity2": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-7650bd2b5f8a47e1",
+          "guid": "d6d2749f-810..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6a",
+          "device_id": "android-ba3338b2ce56415e",
+          "guid": "8fdc35a5-425..."
+        },
+        "identity2": {
+          "device": "motorola edge 40",
+          "device_id": "android-4112650a81e74134",
+          "guid": "799b67d5-76f..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2449",
+          "device_id": "android-29de049f997a408b",
+          "guid": "7daeb566-242..."
+        },
+        "identity2": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-d27e79ae495e4c85",
+          "guid": "ec164869-eb1..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2451",
+          "device_id": "android-818458505dd94c79",
+          "guid": "b0e6ed02-8db..."
+        },
+        "identity2": {
+          "device": "Pixel 6a",
+          "device_id": "android-36118f5397734f7c",
+          "guid": "dc7fc8ee-733..."
+        },
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 7a",
+          "device_id": "android-bff3e71035ec42bf",
+          "guid": "72b05c2f-469..."
+        },
+        "identity2": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-5d10d04eae6d4925",
+          "guid": "f63c728e-cb3..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S908B",
+          "device_id": "android-dcc19611475e4fe7",
+          "guid": "7b2c397e-2e9..."
+        },
+        "identity2": {
+          "device": "2211133C",
+          "device_id": "android-2b320ced05b14db1",
+          "guid": "f96377b8-64c..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-48ee7ed81e2344cb",
+          "guid": "87af2f8a-5b6..."
+        },
+        "identity2": {
+          "device": "LE2123",
+          "device_id": "android-275b61c0addd4e1d",
+          "guid": "2411c83f-927..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "SM-A525F",
+          "device_id": "android-c8a00f375f5c410e",
+          "guid": "0bd834cb-cc6..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-0103cec42ce04952",
+          "guid": "73744d52-bdb..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "SM-G998B",
+          "device_id": "android-f04769da8f004b89",
+          "guid": "c4741c37-68b..."
+        },
+        "identity2": {
+          "device": "23013RK75C",
+          "device_id": "android-c0cc7bfcb91c45c4",
+          "guid": "85fd5e4e-808..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2413",
+          "device_id": "android-0f36eb09c8a240c1",
+          "guid": "b1f40aa2-efa..."
+        },
+        "identity2": {
+          "device": "RMX3785",
+          "device_id": "android-6d8fb93b1369446e",
+          "guid": "ffb9ae89-eac..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S908B",
+          "device_id": "android-02ce3782700849e4",
+          "guid": "f9f9a5e3-b10..."
+        },
+        "identity2": {
+          "device": "SM-A536B",
+          "device_id": "android-649bef1e8b6b4661",
+          "guid": "7abf1466-5a3..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-da9fff190cd04c7d",
+          "guid": "9c742569-3d4..."
+        },
+        "identity2": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-9912b159e3ea4ad4",
+          "guid": "7719286f-c0d..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-735cf9d5068844d4",
+          "guid": "0e303392-d40..."
+        },
+        "identity2": {
+          "device": "2211133C",
+          "device_id": "android-9db7dd5a8b994bf2",
+          "guid": "97746549-940..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "2211133C",
+          "device_id": "android-141bb41526f24a7a",
+          "guid": "f3ffcec4-6e5..."
+        },
+        "identity2": {
+          "device": "moto g84 5G",
+          "device_id": "android-abc732aaddc347fd",
+          "guid": "e44816ec-882..."
+        },
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S918B",
+          "device_id": "android-deda8914c44a49c6",
+          "guid": "71815f6d-d03..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-347683f99ca14a11",
+          "guid": "651b91c3-e27..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-98442f1f130f469b",
+          "guid": "d64e421d-947..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-382e146052c341a2",
+          "guid": "53b81c6f-42d..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-1ad7f4df30734b70",
+          "guid": "3351bd4e-765..."
+        },
+        "identity2": {
+          "device": "SM-G991B",
+          "device_id": "android-7d832b5063ec48a5",
+          "guid": "e029dc1e-ee1..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "SM-G991B",
+          "device_id": "android-2812ab0f4a4b421b",
+          "guid": "f023d728-860..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-be837f960830479e",
+          "guid": "3c03a473-995..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "23013RK75C",
+          "device_id": "android-73e1cffd80674b8d",
+          "guid": "ee6cba40-018..."
+        },
+        "identity2": {
+          "device": "CPH2449",
+          "device_id": "android-d46b86ac2cd1422b",
+          "guid": "d1951248-f2a..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-6a44ae29534e40db",
+          "guid": "6e85932b-d7d..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-7b8a6cb2f986416a",
+          "guid": "546e32cd-e78..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-0d655b9dc0e842f7",
+          "guid": "db321920-af3..."
+        },
+        "identity2": {
+          "device": "moto g84 5G",
+          "device_id": "android-bd0be17ab0f941ac",
+          "guid": "079d0c1e-977..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2451",
+          "device_id": "android-36bd202390b64ab0",
+          "guid": "a8c96126-086..."
+        },
+        "identity2": {
+          "device": "SM-A536B",
+          "device_id": "android-b6a76704b9284105",
+          "guid": "9a3747bf-08c..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "moto g84 5G",
+          "device_id": "android-8abc4b72f0e246a0",
+          "guid": "7f2e9501-6e6..."
+        },
+        "identity2": {
+          "device": "2201116SG",
+          "device_id": "android-3aa1dfb631fb4819",
+          "guid": "5115c4ea-662..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "LE2123",
+          "device_id": "android-5a689f4599bf49d0",
+          "guid": "08295c9d-715..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-b4f9411c5e804920",
+          "guid": "f0df269d-e5f..."
+        },
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2487",
+          "device_id": "android-f67d8bbd335141ce",
+          "guid": "234ed27b-a05..."
+        },
+        "identity2": {
+          "device": "SM-S908B",
+          "device_id": "android-dcd292f1c0b0467c",
+          "guid": "ebd7b059-ea0..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-0e463a4c50a146af",
+          "guid": "9e469b59-1d0..."
+        },
+        "identity2": {
+          "device": "Pixel 6a",
+          "device_id": "android-1552cfc464d440d1",
+          "guid": "f8abd541-a0d..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "SM-G998B",
+          "device_id": "android-e0b97a131f994f2b",
+          "guid": "bfe99d08-db9..."
+        },
+        "identity2": {
+          "device": "motorola edge 40",
+          "device_id": "android-74c80d470c12421d",
+          "guid": "02eda9c1-f8a..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "2211133C",
+          "device_id": "android-3124b841f1d8472a",
+          "guid": "d1e184b2-7f0..."
+        },
+        "identity2": {
+          "device": "CPH2449",
+          "device_id": "android-370cc73a98d04dbe",
+          "guid": "734a22ee-349..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2487",
+          "device_id": "android-72a1dd4ddc864d41",
+          "guid": "233bfde3-f70..."
+        },
+        "identity2": {
+          "device": "CPH2487",
+          "device_id": "android-a66ab72111d64ec0",
+          "guid": "706fd5a9-8ff..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "SM-G991B",
+          "device_id": "android-0cb19796177c4dbc",
+          "guid": "9f9f7ccd-277..."
+        },
+        "identity2": {
+          "device": "SM-A525F",
+          "device_id": "android-fb21e4905e68489d",
+          "guid": "56b0bf3e-7ea..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-647f94375e31450c",
+          "guid": "bb240a2e-9e1..."
+        },
+        "identity2": {
+          "device": "RMX3706",
+          "device_id": "android-d8ba01130f994251",
+          "guid": "087450e7-9de..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S918B",
+          "device_id": "android-ed998368eef1445e",
+          "guid": "0ae3b3ce-1c5..."
+        },
+        "identity2": {
+          "device": "SM-S908B",
+          "device_id": "android-741a747a9ee94b7f",
+          "guid": "84921387-953..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 7a",
+          "device_id": "android-e03909a50f904d82",
+          "guid": "14b68dd7-540..."
+        },
+        "identity2": {
+          "device": "motorola edge 40",
+          "device_id": "android-9100cd4beeab4b31",
+          "guid": "0dc0332c-a22..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "2211133C",
+          "device_id": "android-16b5555f96c24787",
+          "guid": "72d02bb9-94c..."
+        },
+        "identity2": {
+          "device": "moto g84 5G",
+          "device_id": "android-d66b7c871ecf48c9",
+          "guid": "8051e1c5-fc9..."
+        },
+        "proxy": "http://axjoyxsu:nkeue7p68pag@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "2211133C",
+          "device_id": "android-70ae0a7a5c1f4a88",
+          "guid": "9a3b161b-2c4..."
+        },
+        "identity2": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-2f014961532d403e",
+          "guid": "4e4f7158-368..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6a",
+          "device_id": "android-69bc05cf8f7747a5",
+          "guid": "6c7ddf44-a0c..."
+        },
+        "identity2": {
+          "device": "motorola edge 40",
+          "device_id": "android-370c7a5632214537",
+          "guid": "4ba43733-1b2..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "SM-A546B",
+          "device_id": "android-87c740dd95b347ad",
+          "guid": "05a91ef4-091..."
+        },
+        "identity2": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-2c28ab59dafd4bdf",
+          "guid": "42739b98-832..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3706",
+          "device_id": "android-dc05ebf1817c401d",
+          "guid": "48aeb1e1-6dd..."
+        },
+        "identity2": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-f0d3d664a50a4397",
+          "guid": "499823d6-5dc..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "SM-A536B",
+          "device_id": "android-6d61f973ac6c4fc8",
+          "guid": "058011bd-f54..."
+        },
+        "identity2": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-2dbdf5a25b9b41f0",
+          "guid": "fa97c940-e53..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "M2101K6G",
+          "device_id": "android-48711a8a4ab54c6c",
+          "guid": "db097181-71c..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-207d1949a96040ff",
+          "guid": "8071f7dc-7c9..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2413",
+          "device_id": "android-63c667a36a2b46fe",
+          "guid": "8636d71a-134..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-b595efdae40e45f5",
+          "guid": "3ce5e5a3-377..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-966ea8059f794cd8",
+          "guid": "c05ea3c3-e90..."
+        },
+        "identity2": {
+          "device": "2211133C",
+          "device_id": "android-aac47e676c8e46dd",
+          "guid": "1cd2d3aa-403..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-24909bdf1a66401b",
+          "guid": "1eff4aed-0a0..."
+        },
+        "identity2": {
+          "device": "SM-G991B",
+          "device_id": "android-b10aab5e00504f85",
+          "guid": "19f78c3e-47e..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-2a7a3b4183104d90",
+          "guid": "6a8f8117-7d8..."
+        },
+        "identity2": {
+          "device": "M2101K6G",
+          "device_id": "android-a8e218ebe5364b63",
+          "guid": "49e984bd-ec7..."
+        },
+        "proxy": "http://rxfjeodt:tjf4ikwjokhr@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-d9e2f13e67a24a96",
+          "guid": "dc9c3830-b5b..."
+        },
+        "identity2": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-6857324840dc429e",
+          "guid": "b67ae1d0-fe9..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "SM-G998B",
+          "device_id": "android-69f01fa19f934ff7",
+          "guid": "db5ee18e-3b2..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-7904f1805ddd4dbc",
+          "guid": "e89deab0-926..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2487",
+          "device_id": "android-a8fbb4d24eb4492f",
+          "guid": "f6312e1f-2cf..."
+        },
+        "identity2": {
+          "device": "SM-A546B",
+          "device_id": "android-6814829a7f5548e1",
+          "guid": "aa5c447d-075..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S908B",
+          "device_id": "android-5c20352c8fef4b6a",
+          "guid": "ffc4c1f2-2a0..."
+        },
+        "identity2": {
+          "device": "SM-S908B",
+          "device_id": "android-fdb4b5d4f4a7406a",
+          "guid": "b2865780-8d1..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-1ffdffb301d2488d",
+          "guid": "b8201ce4-852..."
+        },
+        "identity2": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-dfe742e8caae4725",
+          "guid": "9e1279ed-971..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S908B",
+          "device_id": "android-901b58fcd4384ed6",
+          "guid": "fec4a906-838..."
+        },
+        "identity2": {
+          "device": "LE2123",
+          "device_id": "android-faf2a4c0e4454b31",
+          "guid": "0aa02aa9-10f..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "motorola edge 40",
+          "device_id": "android-7f80d7a533df42e6",
+          "guid": "9be5fc78-6a6..."
+        },
+        "identity2": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-2e9b7b30cde74e56",
+          "guid": "390b5bce-62d..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6 Pro",
+          "device_id": "android-c3e0a0d1dc1a435a",
+          "guid": "927b68b4-1f6..."
+        },
+        "identity2": {
+          "device": "SM-S908B",
+          "device_id": "android-de42ade498b948e5",
+          "guid": "b4abdfed-9a2..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-671e5d8cb2bf48ec",
+          "guid": "c1cbf9b1-bad..."
+        },
+        "identity2": {
+          "device": "2201116SG",
+          "device_id": "android-0d1b78cdd17f4bcf",
+          "guid": "b1ad7ef1-a0b..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-445bcb96067f4d22",
+          "guid": "959e02d7-7da..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-0fdadcc1206449ff",
+          "guid": "be559003-fa3..."
+        },
+        "proxy": "http://egfosers:kf2wh571ar1z@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "2211133C",
+          "device_id": "android-746fe900ee8041bd",
+          "guid": "2fa73a39-afb..."
+        },
+        "identity2": {
+          "device": "SM-G991B",
+          "device_id": "android-237bc5f096f042ed",
+          "guid": "d71e0115-43f..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S908B",
+          "device_id": "android-8bfc1f02a599442c",
+          "guid": "9356f2d9-f7d..."
+        },
+        "identity2": {
+          "device": "SM-A536B",
+          "device_id": "android-c02f7e05bf424a75",
+          "guid": "d09785aa-c00..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-b385bbae56664d3c",
+          "guid": "77348e64-1c6..."
+        },
+        "identity2": {
+          "device": "CPH2487",
+          "device_id": "android-59d6b712a075469a",
+          "guid": "cf989019-53b..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-9a638dc623ce4672",
+          "guid": "a696b366-8c0..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-d82323484caf4e00",
+          "guid": "45d9d1fb-f5a..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3706",
+          "device_id": "android-c94be5a6b9484966",
+          "guid": "e1d699e8-429..."
+        },
+        "identity2": {
+          "device": "SM-S908B",
+          "device_id": "android-12b949a6e46e42be",
+          "guid": "10d0a5fa-9aa..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3785",
+          "device_id": "android-43d021beaab94129",
+          "guid": "b05d8cec-084..."
+        },
+        "identity2": {
+          "device": "CPH2487",
+          "device_id": "android-5447d1ab892b466a",
+          "guid": "c33565b2-4ad..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "motorola edge 40",
+          "device_id": "android-d1296ea4bf6141db",
+          "guid": "c8bb1fb6-812..."
+        },
+        "identity2": {
+          "device": "SM-S908B",
+          "device_id": "android-5a7816ce974040ff",
+          "guid": "216b5314-69e..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "SM-G998B",
+          "device_id": "android-4e63ab7a2b9a4924",
+          "guid": "9b862a31-2bf..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-e27ff5ecb5144cb0",
+          "guid": "4d7ee1dc-a1d..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "2201116SG",
+          "device_id": "android-1f487dbe569e4d54",
+          "guid": "7e14934d-9c9..."
+        },
+        "identity2": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-e9d9572af7614c90",
+          "guid": "b7081cf0-da5..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "motorola edge 40",
+          "device_id": "android-5e121dd2e85b4e79",
+          "guid": "3555047a-68d..."
+        },
+        "identity2": {
+          "device": "SM-A536B",
+          "device_id": "android-f54bf51541624a67",
+          "guid": "6daf7ba8-742..."
+        },
+        "proxy": "http://kgghxbly:csswtnznqrey@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "2211133C",
+          "device_id": "android-931c87d363cc43e2",
+          "guid": "7c5ad38c-3be..."
+        },
+        "identity2": {
+          "device": "LE2123",
+          "device_id": "android-84fdebf7811f4b35",
+          "guid": "32a53ace-bd4..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "moto g84 5G",
+          "device_id": "android-3eaa6b633b454ae5",
+          "guid": "8183296a-29c..."
+        },
+        "identity2": {
+          "device": "Pixel 6a",
+          "device_id": "android-1031c7d1a653490d",
+          "guid": "40a1b0a4-295..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "moto g84 5G",
+          "device_id": "android-8836fc0ea40f42a6",
+          "guid": "e5e713c1-ff2..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-4c2cb22b1f01445d",
+          "guid": "5310079b-aba..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2451",
+          "device_id": "android-67bce104cc7a446a",
+          "guid": "e68fb9fa-4b3..."
+        },
+        "identity2": {
+          "device": "2201116SG",
+          "device_id": "android-9496b9f3a7d64850",
+          "guid": "f50734fa-9fc..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 7 Pro",
+          "device_id": "android-8bbe8d5cbb2c4d88",
+          "guid": "3e7aa25c-a92..."
+        },
+        "identity2": {
+          "device": "SM-G991B",
+          "device_id": "android-0ec689fa463e4109",
+          "guid": "8ed7fa50-e70..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "SM-G998B",
+          "device_id": "android-8109b66219b44ecf",
+          "guid": "49a66673-897..."
+        },
+        "identity2": {
+          "device": "SM-A536B",
+          "device_id": "android-262e36b6825b4f9e",
+          "guid": "1d500756-1d5..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "moto g84 5G",
+          "device_id": "android-1ad86830e1de4b93",
+          "guid": "41fe8958-7bc..."
+        },
+        "identity2": {
+          "device": "Pixel 8 Pro",
+          "device_id": "android-c3029311926748ba",
+          "guid": "1904eb49-1ff..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 6a",
+          "device_id": "android-f792685093ab4687",
+          "guid": "7605b16b-c57..."
+        },
+        "identity2": {
+          "device": "SM-G998B",
+          "device_id": "android-f2ebd649221346ce",
+          "guid": "232cdd52-85d..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "LE2123",
+          "device_id": "android-7406d54871354afa",
+          "guid": "47f2ba3a-5d6..."
+        },
+        "identity2": {
+          "device": "RMX3785",
+          "device_id": "android-5086f05c2a534df5",
+          "guid": "50811c96-8ab..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "SM-S918B",
+          "device_id": "android-4132f480a1614cb3",
+          "guid": "d23a15c7-2d7..."
+        },
+        "identity2": {
+          "device": "M2101K6G",
+          "device_id": "android-44d5694bb7804e0f",
+          "guid": "37181a54-360..."
+        },
+        "proxy": "http://lnydwdms:n7c0x0qtyrvp@23.27.208.120:5830..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2413",
+          "device_id": "android-e7f3c5bcdc2d4265",
+          "guid": "40514988-406..."
+        },
+        "identity2": {
+          "device": "2201116SG",
+          "device_id": "android-4b5515951713486e",
+          "guid": "d9593c12-acb..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@142.111.48.253:7030..."
+      },
+      {
+        "identity1": {
+          "device": "moto g84 5G",
+          "device_id": "android-a8df5ac487df4156",
+          "guid": "56b63bf4-85d..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-ea068340c978409e",
+          "guid": "4bc17df9-64c..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@23.95.150.145:6114..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3706",
+          "device_id": "android-9409901b0b184143",
+          "guid": "ce7578d8-594..."
+        },
+        "identity2": {
+          "device": "SM-A546B",
+          "device_id": "android-929e61b8ca6f4f6a",
+          "guid": "3dfbdb0c-0c0..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@198.23.239.134:6540..."
+      },
+      {
+        "identity1": {
+          "device": "moto g84 5G",
+          "device_id": "android-8e43c7e6502f4351",
+          "guid": "32f7279e-1da..."
+        },
+        "identity2": {
+          "device": "CPH2487",
+          "device_id": "android-851058216f014dce",
+          "guid": "f7e067ac-520..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@107.172.163.27:6543..."
+      },
+      {
+        "identity1": {
+          "device": "2201116SG",
+          "device_id": "android-4de6209b042b466c",
+          "guid": "5ad91f55-f14..."
+        },
+        "identity2": {
+          "device": "2201116SG",
+          "device_id": "android-1d57ac3c44354270",
+          "guid": "1e6c6981-9ba..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@198.105.121.200:6462..."
+      },
+      {
+        "identity1": {
+          "device": "Pixel 7a",
+          "device_id": "android-28334492765d4339",
+          "guid": "b442bb55-d2a..."
+        },
+        "identity2": {
+          "device": "SM-S918B",
+          "device_id": "android-d21bbb6084ba49bc",
+          "guid": "f8774927-127..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@64.137.96.74:6641..."
+      },
+      {
+        "identity1": {
+          "device": "SM-A525F",
+          "device_id": "android-37689e54d721485d",
+          "guid": "3273a0fe-38c..."
+        },
+        "identity2": {
+          "device": "SM-G998B",
+          "device_id": "android-58ee5c81ecdd41b3",
+          "guid": "0dc47e30-06d..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@84.247.60.125:6095..."
+      },
+      {
+        "identity1": {
+          "device": "SM-A546B",
+          "device_id": "android-c55ffc1f9f5f4578",
+          "guid": "c92dfcf0-709..."
+        },
+        "identity2": {
+          "device": "CPH2413",
+          "device_id": "android-84d41754a89c413d",
+          "guid": "49e5d98c-090..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@216.10.27.159:6837..."
+      },
+      {
+        "identity1": {
+          "device": "RMX3706",
+          "device_id": "android-8fdb0ca837344986",
+          "guid": "3fe61084-df8..."
+        },
+        "identity2": {
+          "device": "M2101K6G",
+          "device_id": "android-2b57fb77b28f4608",
+          "guid": "0a546941-106..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@23.26.71.145:5628..."
+      },
+      {
+        "identity1": {
+          "device": "CPH2449",
+          "device_id": "android-2b5247cb5e1e4763",
+          "guid": "e71e5a18-b3c..."
+        },
+        "identity2": {
+          "device": "SM-A525F",
+          "device_id": "android-536709ca38044f0d",
+          "guid": "02c6e2fa-118..."
+        },
+        "proxy": "http://idzfeaih:tg11yrege1lz@23.27.208.120:5830..."
+      }
+    ],
+    "rate_limits_detected": [],
+    "requests_made": [
+      {
+        "device": "CPH2451",
+        "headers_sample": {
+          "User-Agent": "Instagram 313.0.0.28.109 Android (14/14.0; 560dpi; 1440x3216...",
+          "X-IG-Device-ID": "f67a52d2-558d-47c3-9..."
+        },
+        "identity_num": 1,
+        "index": 0,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@142.111.48....",
+        "username": "ck95c"
+      },
+      {
+        "device": "Pixel 6a",
+        "headers_sample": {
+          "User-Agent": "Instagram 319.0.0.33.114 Android (13/13.0; 420dpi; 1080x2400...",
+          "X-IG-Device-ID": "64e96f52-b3e4-474c-8..."
+        },
+        "identity_num": 1,
+        "index": 1,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@23.95.150.1...",
+        "username": "st9r1"
+      },
+      {
+        "device": "RMX3785",
+        "headers_sample": {
+          "User-Agent": "Instagram 313.0.0.28.109 Android (14/14.0; 560dpi; 1440x3168...",
+          "X-IG-Device-ID": "dc48fb74-00e0-4f9f-9..."
+        },
+        "identity_num": 1,
+        "index": 2,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@198.23.239....",
+        "username": "se6pw"
+      },
+      {
+        "device": "Pixel 7 Pro",
+        "headers_sample": {
+          "User-Agent": "Instagram 312.0.0.32.118 Android (14/14.0; 560dpi; 1440x3120...",
+          "X-IG-Device-ID": "3e78c894-9938-47b2-9..."
+        },
+        "identity_num": 1,
+        "index": 3,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@107.172.163...",
+        "username": "matcq"
+      },
+      {
+        "device": "RMX3785",
+        "headers_sample": {
+          "User-Agent": "Instagram 316.0.0.29.120 Android (14/14.0; 560dpi; 1440x3168...",
+          "X-IG-Device-ID": "2473bb2b-b13b-4e95-9..."
+        },
+        "identity_num": 1,
+        "index": 4,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@198.105.121...",
+        "username": "dy916"
+      },
+      {
+        "device": "CPH2413",
+        "headers_sample": {
+          "User-Agent": "Instagram 310.0.0.28.117 Android (13/13.0; 480dpi; 1080x2400...",
+          "X-IG-Device-ID": "47871a9f-e84e-4299-b..."
+        },
+        "identity_num": 1,
+        "index": 5,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@64.137.96.7...",
+        "username": "bo15n"
+      },
+      {
+        "device": "RMX3706",
+        "headers_sample": {
+          "User-Agent": "Instagram 309.0.0.40.113 Android (13/13.0; 480dpi; 1080x2412...",
+          "X-IG-Device-ID": "2ba4d741-7e58-43fb-a..."
+        },
+        "identity_num": 1,
+        "index": 6,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@84.247.60.1...",
+        "username": "lrc6u"
+      },
+      {
+        "device": "Pixel 6a",
+        "headers_sample": {
+          "User-Agent": "Instagram 317.0.0.31.115 Android (13/13.0; 420dpi; 1080x2400...",
+          "X-IG-Device-ID": "8fdc35a5-4257-4114-8..."
+        },
+        "identity_num": 1,
+        "index": 7,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@216.10.27.1...",
+        "username": "v17yn"
+      },
+      {
+        "device": "CPH2449",
+        "headers_sample": {
+          "User-Agent": "Instagram 318.0.0.27.111 Android (13/13.0; 480dpi; 1080x2400...",
+          "X-IG-Device-ID": "7daeb566-242a-4ea3-a..."
+        },
+        "identity_num": 1,
+        "index": 8,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@23.26.71.14...",
+        "username": "nr7qc"
+      },
+      {
+        "device": "CPH2451",
+        "headers_sample": {
+          "User-Agent": "Instagram 316.0.0.29.120 Android (14/14.0; 560dpi; 1440x3216...",
+          "X-IG-Device-ID": "b0e6ed02-8db7-439d-b..."
+        },
+        "identity_num": 1,
+        "index": 9,
+        "proxy": "http://mpdmbsys:r36zb0uyv1ls@23.27.208.1...",
+        "username": "dpg2f"
+      },
+      {
+        "device": "Pixel 7a",
+        "headers_sample": {
+          "User-Agent": "Instagram 317.0.0.31.115 Android (14/14.0; 440dpi; 1080x2400...",
+          "X-IG-Device-ID": "72b05c2f-4694-41d9-a..."
+        },
+        "identity_num": 1,
+        "index": 10,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@142.111.48....",
+        "username": "k7f1u"
+      },
+      {
+        "device": "SM-S908B",
+        "headers_sample": {
+          "User-Agent": "Instagram 316.0.0.29.120 Android (14/14.0; 600dpi; 1440x3088...",
+          "X-IG-Device-ID": "7b2c397e-2e9d-4ba0-8..."
+        },
+        "identity_num": 1,
+        "index": 11,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@23.95.150.1...",
+        "username": "adxb4"
+      },
+      {
+        "device": "RMX3785",
+        "headers_sample": {
+          "User-Agent": "Instagram 316.0.0.29.120 Android (14/14.0; 560dpi; 1440x3168...",
+          "X-IG-Device-ID": "87af2f8a-5b6c-47f7-9..."
+        },
+        "identity_num": 1,
+        "index": 12,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@198.23.239....",
+        "username": "ogpq6"
+      },
+      {
+        "device": "SM-A525F",
+        "headers_sample": {
+          "User-Agent": "Instagram 312.0.0.32.118 Android (12/12.0; 440dpi; 1080x2340...",
+          "X-IG-Device-ID": "0bd834cb-cc64-4763-8..."
+        },
+        "identity_num": 1,
+        "index": 13,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@107.172.163...",
+        "username": "sscpm"
+      },
+      {
+        "device": "SM-G998B",
+        "headers_sample": {
+          "User-Agent": "Instagram 309.0.0.40.113 Android (13/13.0; 640dpi; 1440x3200...",
+          "X-IG-Device-ID": "c4741c37-68ba-4774-b..."
+        },
+        "identity_num": 1,
+        "index": 14,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@198.105.121...",
+        "username": "eeth7"
+      },
+      {
+        "device": "CPH2413",
+        "headers_sample": {
+          "User-Agent": "Instagram 309.0.0.40.113 Android (13/13.0; 480dpi; 1080x2400...",
+          "X-IG-Device-ID": "b1f40aa2-efa4-49b3-a..."
+        },
+        "identity_num": 1,
+        "index": 15,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@64.137.96.7...",
+        "username": "ujybo"
+      },
+      {
+        "device": "SM-S908B",
+        "headers_sample": {
+          "User-Agent": "Instagram 315.0.0.26.109 Android (14/14.0; 600dpi; 1440x3088...",
+          "X-IG-Device-ID": "f9f9a5e3-b10b-43ac-a..."
+        },
+        "identity_num": 1,
+        "index": 16,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@84.247.60.1...",
+        "username": "b8ggp"
+      },
+      {
+        "device": "Pixel 8 Pro",
+        "headers_sample": {
+          "User-Agent": "Instagram 319.0.0.33.114 Android (14/14.0; 560dpi; 1344x2992...",
+          "X-IG-Device-ID": "9c742569-3d43-4c67-9..."
+        },
+        "identity_num": 1,
+        "index": 17,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@216.10.27.1...",
+        "username": "v5yvd"
+      },
+      {
+        "device": "RMX3785",
+        "headers_sample": {
+          "User-Agent": "Instagram 310.0.0.28.117 Android (14/14.0; 560dpi; 1440x3168...",
+          "X-IG-Device-ID": "0e303392-d400-4098-b..."
+        },
+        "identity_num": 1,
+        "index": 18,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@23.26.71.14...",
+        "username": "q81d7"
+      },
+      {
+        "device": "2211133C",
+        "headers_sample": {
+          "User-Agent": "Instagram 319.0.0.33.114 Android (13/13.0; 480dpi; 1220x2712...",
+          "X-IG-Device-ID": "f3ffcec4-6e5f-4839-8..."
+        },
+        "identity_num": 1,
+        "index": 19,
+        "proxy": "http://wjeirsdr:jw66naw4tr9i@23.27.208.1...",
+        "username": "f9md2"
+      },
+      {
+        "device": "SM-S918B",
+        "headers_sample": {
+          "User-Agent": "Instagram 313.0.0.28.109 Android (14/14.0; 640dpi; 1440x3088...",
+          "X-IG-Device-ID": "71815f6d-d032-4f65-9..."
+        },
+        "identity_num": 1,
+        "index": 20,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@142.111.48....",
+        "username": "x7umb"
+      },
+      {
+        "device": "RMX3785",
+        "headers_sample": {
+          "User-Agent": "Instagram 314.0.0.24.110 Android (14/14.0; 560dpi; 1440x3168...",
+          "X-IG-Device-ID": "d64e421d-9470-4d88-9..."
+        },
+        "identity_num": 1,
+        "index": 21,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@23.95.150.1...",
+        "username": "u9fjt"
+      },
+      {
+        "device": "Pixel 8 Pro",
+        "headers_sample": {
+          "User-Agent": "Instagram 313.0.0.28.109 Android (14/14.0; 560dpi; 1344x2992...",
+          "X-IG-Device-ID": "3351bd4e-7657-49e9-8..."
+        },
+        "identity_num": 1,
+        "index": 22,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@198.23.239....",
+        "username": "mvi5s"
+      },
+      {
+        "device": "SM-G991B",
+        "headers_sample": {
+          "User-Agent": "Instagram 309.0.0.40.113 Android (13/13.0; 480dpi; 1080x2400...",
+          "X-IG-Device-ID": "f023d728-8608-4c36-8..."
+        },
+        "identity_num": 1,
+        "index": 23,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@107.172.163...",
+        "username": "llors"
+      },
+      {
+        "device": "23013RK75C",
+        "headers_sample": {
+          "User-Agent": "Instagram 308.0.0.38.108 Android (14/14.0; 560dpi; 1440x3200...",
+          "X-IG-Device-ID": "ee6cba40-0181-4147-9..."
+        },
+        "identity_num": 1,
+        "index": 24,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@198.105.121...",
+        "username": "saear"
+      },
+      {
+        "device": "RMX3785",
+        "headers_sample": {
+          "User-Agent": "Instagram 310.0.0.28.117 Android (14/14.0; 560dpi; 1440x3168...",
+          "X-IG-Device-ID": "6e85932b-d7de-4fbd-b..."
+        },
+        "identity_num": 1,
+        "index": 25,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@64.137.96.7...",
+        "username": "biu7x"
+      },
+      {
+        "device": "RMX3785",
+        "headers_sample": {
+          "User-Agent": "Instagram 311.0.0.32.119 Android (14/14.0; 560dpi; 1440x3168...",
+          "X-IG-Device-ID": "db321920-af33-46f3-a..."
+        },
+        "identity_num": 1,
+        "index": 26,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@84.247.60.1...",
+        "username": "kyw8p"
+      },
+      {
+        "device": "CPH2451",
+        "headers_sample": {
+          "User-Agent": "Instagram 316.0.0.29.120 Android (14/14.0; 560dpi; 1440x3216...",
+          "X-IG-Device-ID": "a8c96126-086e-462d-8..."
+        },
+        "identity_num": 1,
+        "index": 27,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@216.10.27.1...",
+        "username": "srfwj"
+      },
+      {
+        "device": "moto g84 5G",
+        "headers_sample": {
+          "User-Agent": "Instagram 317.0.0.31.115 Android (13/13.0; 440dpi; 1080x2400...",
+          "X-IG-Device-ID": "7f2e9501-6e64-4fc8-a..."
+        },
+        "identity_num": 1,
+        "index": 28,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@23.26.71.14...",
+        "username": "gwki6"
+      },
+      {
+        "device": "LE2123",
+        "headers_sample": {
+          "User-Agent": "Instagram 309.0.0.40.113 Android (13/13.0; 560dpi; 1440x3216...",
+          "X-IG-Device-ID": "08295c9d-7154-4fa6-9..."
+        },
+        "identity_num": 1,
+        "index": 29,
+        "proxy": "http://yfryygud:8o2xjhpyq9xj@23.27.208.1...",
+        "username": "ry54g"
+      },
+      {
+        "device": "CPH2487",
+        "headers_sample": {
+          "User-Agent": "Instagram 315.0.0.26.109 Android (14/14.0; 560dpi; 1440x3216...",
+          "X-IG-Device-ID": "234ed27b-a05d-462e-b..."
+        },
+        "identity_num": 1,
+        "index": 30,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@142.111.48....",
+        "username": "wtaou"
+      },
+      {
+        "device": "Pixel 8 Pro",
+        "headers_sample": {
+          "User-Agent": "Instagram 313.0.0.28.109 Android (14/14.0; 560dpi; 1344x2992...",
+          "X-IG-Device-ID": "9e469b59-1d07-483c-a..."
+        },
+        "identity_num": 1,
+        "index": 31,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@23.95.150.1...",
+        "username": "ul5d4"
+      },
+      {
+        "device": "SM-G998B",
+        "headers_sample": {
+          "User-Agent": "Instagram 317.0.0.31.115 Android (13/13.0; 640dpi; 1440x3200...",
+          "X-IG-Device-ID": "bfe99d08-db95-4c64-a..."
+        },
+        "identity_num": 1,
+        "index": 32,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@198.23.239....",
+        "username": "wmrj9"
+      },
+      {
+        "device": "2211133C",
+        "headers_sample": {
+          "User-Agent": "Instagram 317.0.0.31.115 Android (13/13.0; 480dpi; 1220x2712...",
+          "X-IG-Device-ID": "d1e184b2-7f01-41a1-b..."
+        },
+        "identity_num": 1,
+        "index": 33,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@107.172.163...",
+        "username": "i4qcu"
+      },
+      {
+        "device": "CPH2487",
+        "headers_sample": {
+          "User-Agent": "Instagram 314.0.0.24.110 Android (14/14.0; 560dpi; 1440x3216...",
+          "X-IG-Device-ID": "233bfde3-f700-4d80-a..."
+        },
+        "identity_num": 1,
+        "index": 34,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@198.105.121...",
+        "username": "bxpqz"
+      },
+      {
+        "device": "SM-G991B",
+        "headers_sample": {
+          "User-Agent": "Instagram 319.0.0.33.114 Android (13/13.0; 480dpi; 1080x2400...",
+          "X-IG-Device-ID": "9f9f7ccd-2776-4f8d-9..."
+        },
+        "identity_num": 1,
+        "index": 35,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@64.137.96.7...",
+        "username": "mah24"
+      },
+      {
+        "device": "Pixel 6 Pro",
+        "headers_sample": {
+          "User-Agent": "Instagram 311.0.0.32.119 Android (13/13.0; 560dpi; 1440x3120...",
+          "X-IG-Device-ID": "bb240a2e-9e11-4d7f-9..."
+        },
+        "identity_num": 1,
+        "index": 36,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@84.247.60.1...",
+        "username": "altf3"
+      },
+      {
+        "device": "SM-S918B",
+        "headers_sample": {
+          "User-Agent": "Instagram 312.0.0.32.118 Android (14/14.0; 640dpi; 1440x3088...",
+          "X-IG-Device-ID": "0ae3b3ce-1c5a-4aec-b..."
+        },
+        "identity_num": 1,
+        "index": 37,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@216.10.27.1...",
+        "username": "jpaot"
+      },
+      {
+        "device": "Pixel 7a",
+        "headers_sample": {
+          "User-Agent": "Instagram 317.0.0.31.115 Android (14/14.0; 440dpi; 1080x2400...",
+          "X-IG-Device-ID": "14b68dd7-5407-4685-a..."
+        },
+        "identity_num": 1,
+        "index": 38,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@23.26.71.14...",
+        "username": "peqv5"
+      },
+      {
+        "device": "2211133C",
+        "headers_sample": {
+          "User-Agent": "Instagram 313.0.0.28.109 Android (13/13.0; 480dpi; 1220x2712...",
+          "X-IG-Device-ID": "72d02bb9-94cc-415c-a..."
+        },
+        "identity_num": 1,
+        "index": 39,
+        "proxy": "http://axjoyxsu:nkeue7p68pag@23.27.208.1...",
+        "username": "cdt8r"
+      }
+    ],
+    "responses_received": [
+      {
+        "response_preview": null,
+        "status": "taken",
+        "username": "peqv5"
+      },
+      {
+        "response_preview": null,
+        "status": "available",
+        "username": "x7umb"
+      }
+    ],
+    "timeline": [
+      {
+        "data": {
+          "config": {
+            "API_URL": "https://i.instagram.com/api/v1/users/check_username/",
+            "COOLDOWN_TIME": 45,
+            "ENABLE_SMART_ROTATION": true,
+            "MAX_CONCURRENT": 40,
+            "MAX_DELAY": 1.2,
+            "MAX_REQUESTS_PER_PROXY": 8,
+            "MIN_DELAY": 0.3,
+            "PROXIES_FILE": "proxies.txt",
+            "PROXY_REST_TIME": 20,
+            "REQUEST_TIMEOUT": 10,
+            "TIMEOUT": 90,
+            "TYPING_SIMULATION": true
+          },
+          "proxies_count": 90,
+          "warm_sessions": 60
+        },
+        "event": "INIT",
+        "time": 0
+      },
+      {
+        "data": {
+          "count": 90,
+          "total_identities": 180
+        },
+        "event": "IDENTITIES_CREATED",
+        "time": 0.0183
+      },
+      {
+        "data": {
+          "available_proxies": 90,
+          "batch": 1,
+          "rate_limited_proxies": 0
+        },
+        "event": "BATCH_START",
+        "time": 0.0184
+      },
+      {
+        "data": {
+          "count": 40,
+          "samples": [
+            "ck95c",
+            "st9r1",
+            "se6pw",
+            "matcq",
+            "dy916"
+          ]
+        },
+        "event": "USERNAMES_GENERATED",
+        "time": 0.0185
+      },
+      {
+        "data": {
+          "count": 40
+        },
+        "event": "REQUESTS_SENT",
+        "time": 2.7755
+      },
+      {
+        "data": {
+          "duration": 3.4819,
+          "total_checked": 2,
+          "username": "x7umb"
+        },
+        "event": "FOUND_AVAILABLE",
+        "time": 3.4819
+      },
+      {
+        "data": {
+          "closing_clients": 40
+        },
+        "event": "CLEANUP",
+        "time": 3.482
+      }
+    ],
+    "usernames_checked": [
+      "peqv5",
+      "x7umb"
+    ]
+  },
+  "duration": 3.4819,
+  "rate_limited_proxies": "0/90",
+  "stats": {
+    "checked": 2,
+    "errors": 0,
+    "rate_limits": 0,
+    "taken": 1,
+    "timeouts": 0
+  },
+  "status": "success",
+  "username": "x7umb"
+}

@@ -24,7 +24,7 @@ from uuid import uuid4
 from dataclasses import dataclass, field
 
 import httpx
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 
 sys.dont_write_bytecode = True
@@ -1268,6 +1268,12 @@ async def detailed_semi_quad_stealth_search() -> Dict[str, Any]:
 # ==========================================
 #              API ROUTES
 # ==========================================
+@app.route('/dashboard')
+def dashboard():
+    """Admin dashboard - HTML interface."""
+    return render_template('dashboard.html')
+
+
 @app.route('/')
 def home():
     stats = get_proxy_stats()
