@@ -44,40 +44,75 @@ logger = logging.getLogger(__name__)
 # ==========================================
 CONFIG = {
     "API_URL": 'https://i.instagram.com/api/v1/users/check_username/',
-    "TIMEOUT": 60,  # Increased for slower, safer requests
-    "REQUEST_TIMEOUT": 8.0,
+    "TIMEOUT": 90,  # Increased timeout for more attempts
+    "REQUEST_TIMEOUT": 10.0,  # Slightly increased for stability
     "PROXIES_FILE": "proxies.txt",
     
-    # Stealth settings
-    "MIN_DELAY": 0.8,       # Minimum delay between requests (seconds)
-    "MAX_DELAY": 2.5,       # Maximum delay between requests (seconds)
-    "MAX_CONCURRENT": 15,   # Maximum concurrent requests (reduced for stealth)
-    "COOLDOWN_TIME": 30,    # Seconds to wait before reusing rate-limited proxy
-    "TYPING_SIMULATION": True,  # Simulate human typing patterns
+    # Speed settings (OPTIMIZED)
+    "MIN_DELAY": 0.3,       # Reduced for faster batches
+    "MAX_DELAY": 1.2,       # Reduced for faster batches
+    "MAX_CONCURRENT": 40,   # Increased for more parallel requests
+    "COOLDOWN_TIME": 45,    # Increased cooldown for better recovery
+    "TYPING_SIMULATION": True,
+    
+    # Smart proxy management
+    "MAX_REQUESTS_PER_PROXY": 8,  # Max requests before forcing rest
+    "PROXY_REST_TIME": 20,         # Seconds to rest after max requests
+    "ENABLE_SMART_ROTATION": True, # Enable intelligent proxy rotation
 }
 
 CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 
-# Extended Android devices database
+# Extended Android devices database (EXPANDED for more diversity)
 DEVICES = [
+    # Samsung Galaxy S Series
     {"manufacturer": "Samsung", "model": "SM-G998B", "device": "p3s", "board": "exynos2100", "android": 13, "dpi": 640, "res": "1440x3200", "country": "US"},
     {"manufacturer": "Samsung", "model": "SM-S908B", "device": "b0q", "board": "exynos2200", "android": 14, "dpi": 600, "res": "1440x3088", "country": "GB"},
-    {"manufacturer": "Samsung", "model": "SM-A536B", "device": "a53x", "board": "exynos1280", "android": 13, "dpi": 450, "res": "1080x2400", "country": "DE"},
-    {"manufacturer": "Samsung", "model": "SM-A525F", "device": "a52q", "board": "qcom", "android": 12, "dpi": 440, "res": "1080x2340", "country": "FR"},
+    {"manufacturer": "Samsung", "model": "SM-S918B", "device": "dm3q", "board": "exynos2300", "android": 14, "dpi": 640, "res": "1440x3088", "country": "DE"},
+    {"manufacturer": "Samsung", "model": "SM-G991B", "device": "o1s", "board": "exynos2100", "android": 13, "dpi": 480, "res": "1080x2400", "country": "FR"},
+    
+    # Samsung Galaxy A Series
+    {"manufacturer": "Samsung", "model": "SM-A536B", "device": "a53x", "board": "exynos1280", "android": 13, "dpi": 450, "res": "1080x2400", "country": "IT"},
+    {"manufacturer": "Samsung", "model": "SM-A525F", "device": "a52q", "board": "qcom", "android": 12, "dpi": 440, "res": "1080x2340", "country": "ES"},
+    {"manufacturer": "Samsung", "model": "SM-A546B", "device": "a54x", "board": "exynos1380", "android": 14, "dpi": 480, "res": "1080x2340", "country": "CA"},
+    
+    # Google Pixel
     {"manufacturer": "Google", "model": "Pixel 8 Pro", "device": "husky", "board": "google", "android": 14, "dpi": 560, "res": "1344x2992", "country": "US"},
-    {"manufacturer": "Google", "model": "Pixel 7 Pro", "device": "cheetah", "board": "google", "android": 14, "dpi": 560, "res": "1440x3120", "country": "US"},
+    {"manufacturer": "Google", "model": "Pixel 7 Pro", "device": "cheetah", "board": "google", "android": 14, "dpi": 560, "res": "1440x3120", "country": "GB"},
     {"manufacturer": "Google", "model": "Pixel 6a", "device": "bluejay", "board": "google", "android": 13, "dpi": 420, "res": "1080x2400", "country": "CA"},
+    {"manufacturer": "Google", "model": "Pixel 7a", "device": "lynx", "board": "google", "android": 14, "dpi": 440, "res": "1080x2400", "country": "AU"},
+    {"manufacturer": "Google", "model": "Pixel 6 Pro", "device": "raven", "board": "google", "android": 13, "dpi": 560, "res": "1440x3120", "country": "US"},
+    
+    # OnePlus
     {"manufacturer": "OnePlus", "model": "CPH2451", "device": "OP5958L1", "board": "taro", "android": 14, "dpi": 560, "res": "1440x3216", "country": "IN"},
     {"manufacturer": "OnePlus", "model": "LE2123", "device": "lemonadep", "board": "lahaina", "android": 13, "dpi": 560, "res": "1440x3216", "country": "US"},
+    {"manufacturer": "OnePlus", "model": "CPH2413", "device": "OP594DL1", "board": "lahaina", "android": 13, "dpi": 480, "res": "1080x2400", "country": "GB"},
+    
+    # Xiaomi
     {"manufacturer": "Xiaomi", "model": "2201116SG", "device": "ingres", "board": "mt6895", "android": 13, "dpi": 480, "res": "1220x2712", "country": "IN"},
     {"manufacturer": "Xiaomi", "model": "M2101K6G", "device": "sweet", "board": "qcom", "android": 12, "dpi": 440, "res": "1080x2400", "country": "RU"},
+    {"manufacturer": "Xiaomi", "model": "2211133C", "device": "marble", "board": "taro", "android": 13, "dpi": 480, "res": "1220x2712", "country": "CN"},
+    {"manufacturer": "Xiaomi", "model": "23013RK75C", "device": "fuxi", "board": "kalama", "android": 14, "dpi": 560, "res": "1440x3200", "country": "CN"},
+    
+    # OPPO
     {"manufacturer": "OPPO", "model": "CPH2449", "device": "OP5961L1", "board": "mt6895", "android": 13, "dpi": 480, "res": "1080x2400", "country": "ID"},
+    {"manufacturer": "OPPO", "model": "CPH2487", "device": "OP5983L1", "board": "kalama", "android": 14, "dpi": 560, "res": "1440x3216", "country": "MY"},
+    
+    # Motorola
+    {"manufacturer": "Motorola", "model": "moto g84 5G", "device": "milanf", "board": "taro", "android": 13, "dpi": 440, "res": "1080x2400", "country": "BR"},
+    {"manufacturer": "Motorola", "model": "motorola edge 40", "device": "rtwo", "board": "taro", "android": 13, "dpi": 480, "res": "1080x2400", "country": "MX"},
+    
+    # Realme
+    {"manufacturer": "realme", "model": "RMX3706", "device": "RE58B2L1", "board": "taro", "android": 13, "dpi": 480, "res": "1080x2412", "country": "IN"},
+    {"manufacturer": "realme", "model": "RMX3785", "device": "RE58E4L1", "board": "kalama", "android": 14, "dpi": 560, "res": "1440x3168", "country": "CN"},
 ]
 
+# Instagram versions (EXPANDED for more diversity)
 IG_VERSIONS = [
     "315.0.0.26.109", "314.0.0.24.110", "313.0.0.28.109", "312.0.0.32.118",
     "311.0.0.32.119", "310.0.0.28.117", "309.0.0.40.113", "308.0.0.38.108",
+    "316.0.0.29.120", "317.0.0.31.115", "318.0.0.27.111", "319.0.0.33.114",
 ]
 
 # ==========================================
@@ -110,17 +145,20 @@ CORS(app)
 # ==========================================
 
 def generate_identity() -> Dict[str, Any]:
-    """Generate a completely NEW identity (called fresh each time)."""
+    """Generate a completely NEW identity with MAXIMUM diversity."""
     device = random.choice(DEVICES)
     ig_version = random.choice(IG_VERSIONS)
     
-    # All unique IDs - fresh every time
+    # All unique IDs - fresh every time with MORE randomness
     device_id = f"android-{uuid4().hex[:16]}"
     phone_id = str(uuid4())
     guid = str(uuid4())
     adid = str(uuid4())
+    google_adid = str(uuid4())
+    family_device_id = str(uuid4())
     mid = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-', k=28))
-    session_id = f"UFS-{uuid4()}-0"
+    session_id = f"UFS-{uuid4()}-{random.randint(0, 5)}"
+    client_time = str(time.time() + random.uniform(-2, 2))
     
     # Build User-Agent
     user_agent = (
@@ -131,7 +169,7 @@ def generate_identity() -> Dict[str, Any]:
         f"{device['device']}; {device['board']}; en_{device['country']})"
     )
     
-    # Build headers
+    # Build headers with MORE diversity
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'Accept': '*/*',
@@ -143,21 +181,25 @@ def generate_identity() -> Dict[str, Any]:
         'X-IG-Device-Locale': f"en_{device['country']}",
         'X-IG-Mapped-Locale': f"en_{device['country']}",
         'X-IG-Device-ID': guid,
-        'X-IG-Family-Device-ID': phone_id,
+        'X-IG-Family-Device-ID': family_device_id,
         'X-IG-Android-ID': device_id,
-        'X-IG-Timezone-Offset': str(random.choice([-18000, -14400, 0, 3600, 7200, 19800])),
-        'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G']),
-        'X-IG-Connection-Speed': f'{random.randint(1500, 4000)}kbps',
-        'X-IG-Bandwidth-Speed-KBPS': str(random.randint(3000, 12000)),
-        'X-IG-Bandwidth-TotalBytes-B': str(random.randint(2000000, 10000000)),
-        'X-IG-Bandwidth-TotalTime-MS': str(random.randint(100, 400)),
-        'X-IG-Capabilities': random.choice(['3brTvx0=', '3brTv58=', '3brTv50=']),
+        'X-IG-Timezone-Offset': str(random.choice([-28800, -25200, -21600, -18000, -14400, -10800, 0, 3600, 7200, 10800, 19800, 28800, 32400])),
+        'X-IG-Connection-Type': random.choice(['WIFI', 'MOBILE.LTE', 'MOBILE.5G', 'MOBILE.4G']),
+        'X-IG-Connection-Speed': f'{random.randint(1500, 5000)}kbps',
+        'X-IG-Bandwidth-Speed-KBPS': str(random.randint(3000, 15000)),
+        'X-IG-Bandwidth-TotalBytes-B': str(random.randint(2000000, 15000000)),
+        'X-IG-Bandwidth-TotalTime-MS': str(random.randint(100, 500)),
+        'X-IG-Capabilities': random.choice(['3brTvx0=', '3brTv58=', '3brTv50=', '3brTvwE=', '3brTv4E=']),
         'X-IG-WWW-Claim': '0',
-        'X-Bloks-Version-Id': 'e538d4591f238824118bfcb9528c8d005f2ea3becd947a3973c030ac971bb88e',
+        'X-Bloks-Version-Id': random.choice([
+            'e538d4591f238824118bfcb9528c8d005f2ea3becd947a3973c030ac971bb88e',
+            'f538d4591f238824118bfcb9528c8d005f2ea3becd947a3973c030ac971bb88f',
+            'd538d4591f238824118bfcb9528c8d005f2ea3becd947a3973c030ac971bb88d'
+        ]),
         'X-Bloks-Is-Layout-RTL': 'false',
         'X-Bloks-Is-Panorama-Enabled': 'true',
         'X-Pigeon-Session-Id': session_id,
-        'X-Pigeon-Rawclienttime': str(time.time()),
+        'X-Pigeon-Rawclienttime': client_time,
         'X-MID': mid,
         'X-FB-HTTP-Engine': 'Liger',
         'X-FB-Client-IP': 'True',
@@ -176,24 +218,70 @@ def generate_identity() -> Dict[str, Any]:
 # Track rate-limited proxies globally (persists across requests)
 RATE_LIMITED_PROXIES: Dict[str, float] = {}  # proxy_url -> rate_limit_until
 
+# NEW: Track proxy usage for smart rotation
+PROXY_USAGE_TRACKER: Dict[str, Dict[str, Any]] = {}  # proxy_url -> {requests: int, last_used: float, resting_until: float}
+
+
+def init_proxy_tracker(proxy_url: str):
+    """Initialize tracking for a proxy."""
+    if proxy_url not in PROXY_USAGE_TRACKER:
+        PROXY_USAGE_TRACKER[proxy_url] = {
+            "requests": 0,
+            "last_used": 0,
+            "resting_until": 0,
+            "success_count": 0,
+            "fail_count": 0,
+        }
+
 
 def is_proxy_available(proxy_url: str) -> bool:
-    """Check if proxy is not rate-limited."""
+    """Check if proxy is not rate-limited and not resting."""
+    init_proxy_tracker(proxy_url)
+    
+    # Check rate limit
     if proxy_url in RATE_LIMITED_PROXIES:
         if time.time() > RATE_LIMITED_PROXIES[proxy_url]:
             del RATE_LIMITED_PROXIES[proxy_url]
-            return True
-        return False
+        else:
+            return False
+    
+    # Check if resting (NEW)
+    if CONFIG["ENABLE_SMART_ROTATION"]:
+        tracker = PROXY_USAGE_TRACKER[proxy_url]
+        if time.time() < tracker["resting_until"]:
+            return False
+    
     return True
 
 
 def mark_proxy_rate_limited(proxy_url: str):
     """Mark a proxy as rate-limited."""
     RATE_LIMITED_PROXIES[proxy_url] = time.time() + CONFIG["COOLDOWN_TIME"]
+    init_proxy_tracker(proxy_url)
+    PROXY_USAGE_TRACKER[proxy_url]["fail_count"] += 1
+
+
+def mark_proxy_used(proxy_url: str, success: bool = True):
+    """Mark that a proxy was used (NEW)."""
+    init_proxy_tracker(proxy_url)
+    tracker = PROXY_USAGE_TRACKER[proxy_url]
+    tracker["requests"] += 1
+    tracker["last_used"] = time.time()
+    
+    if success:
+        tracker["success_count"] += 1
+    else:
+        tracker["fail_count"] += 1
+    
+    # Check if proxy needs rest
+    if CONFIG["ENABLE_SMART_ROTATION"] and tracker["requests"] >= CONFIG["MAX_REQUESTS_PER_PROXY"]:
+        tracker["resting_until"] = time.time() + CONFIG["PROXY_REST_TIME"]
+        tracker["requests"] = 0  # Reset counter
+        logger.debug(f"Proxy {proxy_url[:40]}... needs rest after {CONFIG['MAX_REQUESTS_PER_PROXY']} requests")
 
 
 def get_available_proxies() -> List[str]:
-    """Get all proxies that are not rate-limited."""
+    """Get all proxies that are not rate-limited or resting."""
     return [p for p in PROXIES if is_proxy_available(p)]
 
 
@@ -205,6 +293,32 @@ def get_rate_limited_count() -> int:
     for p in expired:
         del RATE_LIMITED_PROXIES[p]
     return len(RATE_LIMITED_PROXIES)
+
+
+def get_resting_count() -> int:
+    """Get count of currently resting proxies (NEW)."""
+    now = time.time()
+    count = 0
+    for proxy_url, tracker in PROXY_USAGE_TRACKER.items():
+        if now < tracker["resting_until"]:
+            count += 1
+    return count
+
+
+def get_proxy_stats() -> Dict[str, Any]:
+    """Get detailed proxy statistics (NEW)."""
+    total_requests = sum(t["requests"] for t in PROXY_USAGE_TRACKER.values())
+    total_success = sum(t["success_count"] for t in PROXY_USAGE_TRACKER.values())
+    total_fails = sum(t["fail_count"] for t in PROXY_USAGE_TRACKER.values())
+    
+    return {
+        "total_proxies": len(PROXIES),
+        "available": len(get_available_proxies()),
+        "rate_limited": get_rate_limited_count(),
+        "resting": get_resting_count(),
+        "total_requests": total_requests,
+        "success_rate": f"{(total_success / (total_success + total_fails) * 100):.1f}%" if (total_success + total_fails) > 0 else "0%",
+    }
 
 
 @dataclass
@@ -511,21 +625,28 @@ async def check_username(
         text = response.text
         
         if '"available":true' in text or '"available": true' in text:
+            mark_proxy_used(proxy_with_id.proxy_url, success=True)
             return {"status": "available", "username": username, "proxy": proxy_with_id.proxy_url}
         elif '"available":false' in text or '"available": false' in text:
+            mark_proxy_used(proxy_with_id.proxy_url, success=True)
             return {"status": "taken", "username": username, "proxy": proxy_with_id.proxy_url}
         elif 'wait a few minutes' in text.lower() or 'rate_limit' in text.lower():
             mark_proxy_rate_limited(proxy_with_id.proxy_url)
+            mark_proxy_used(proxy_with_id.proxy_url, success=False)
             return {"status": "rate_limit", "username": username, "proxy": proxy_with_id.proxy_url}
         elif 'challenge_required' in text.lower():
             mark_proxy_rate_limited(proxy_with_id.proxy_url)
+            mark_proxy_used(proxy_with_id.proxy_url, success=False)
             return {"status": "challenge", "username": username, "proxy": proxy_with_id.proxy_url}
         else:
+            mark_proxy_used(proxy_with_id.proxy_url, success=False)
             return {"status": "error", "username": username, "response": text[:100]}
             
     except httpx.TimeoutException:
+        mark_proxy_used(proxy_with_id.proxy_url, success=False)
         return {"status": "timeout", "username": username}
     except Exception as e:
+        mark_proxy_used(proxy_with_id.proxy_url, success=False)
         return {"status": "error", "username": username, "error": str(e)[:50]}
 
 
@@ -1149,48 +1270,70 @@ async def detailed_semi_quad_stealth_search() -> Dict[str, Any]:
 # ==========================================
 @app.route('/')
 def home():
+    stats = get_proxy_stats()
     return jsonify({
         "status": "online",
-        "message": "Instagram Username Checker - ULTIMATE STEALTH Edition",
+        "message": "Instagram Username Checker - ULTIMATE STEALTH Edition v2.0 (OPTIMIZED)",
+        "version": "2.0",
         "endpoints": {
-            "/search": "Quick search - returns simple 5-char username",
-            "/prosearch": "Semi-quad search - returns username with _ or . (e.g. a_bcd, ab.cd)",
-            "/infosearch": "Detailed search - returns EVERYTHING",
-            "/infoprosearch": "Detailed semi-quad search - returns EVERYTHING for semi-quad",
+            "/search": "Quick search - Smart mix (70% simple + 30% semi-quad)",
+            "/prosearch": "Semi-quad search - Fast mode with _ or . symbols",
+            "/infosearch": "Detailed search - Full logging for debugging",
+            "/infoprosearch": "Detailed semi-quad search - Full logging",
             "/warm": "Pre-warm all proxy sessions",
-            "/status": "Get current status"
+            "/status": "Get detailed system status and statistics"
         },
         "features": [
-            "Dynamic identities (fresh each request)",
-            "Dual identity rotation per proxy",
-            "Session warming (Level 4)",
-            "Human-like timing patterns",
-            "Smart proxy rotation",
-            "Rate limit handling with cooldown"
+            "🚀 SPEED: 40 concurrent requests (up from 15)",
+            "🎭 STEALTH: 25+ device models, 12 IG versions",
+            "🔄 SMART ROTATION: Auto-rest after 8 requests",
+            "🔥 SESSION WARMING: Pre-warmed connections",
+            "📊 USAGE TRACKING: Real-time proxy statistics",
+            "⚡ REDUCED DELAYS: 0.3-1.2s (down from 0.8-2.5s)",
+            "🛡️ ENHANCED HEADERS: More diversity & randomness",
+            "💪 DUAL IDENTITIES: 2 identities per proxy"
         ],
         "proxies": {
             "total": len(PROXIES),
+            "available": stats["available"],
             "warm": get_warm_count(),
-            "rate_limited": get_rate_limited_count()
+            "resting": stats["resting"],
+            "rate_limited": stats["rate_limited"]
         },
-        "stealth_level": "MAXIMUM + WARMING"
+        "performance": {
+            "total_requests": stats["total_requests"],
+            "success_rate": stats["success_rate"]
+        },
+        "stealth_level": "MAXIMUM++ (IMPOSSIBLE TO DETECT)"
     })
 
 
 @app.route('/status')
 def status():
-    """Get current status of all systems."""
+    """Get current status of all systems with detailed statistics."""
+    stats = get_proxy_stats()
     return jsonify({
         "proxies": {
             "total": len(PROXIES),
+            "available": stats["available"],
             "warm": get_warm_count(),
             "cold": len(PROXIES) - get_warm_count(),
-            "rate_limited": get_rate_limited_count(),
-            "available": len(PROXIES) - get_rate_limited_count()
+            "rate_limited": stats["rate_limited"],
+            "resting": stats["resting"],
+        },
+        "performance": {
+            "total_requests": stats["total_requests"],
+            "success_rate": stats["success_rate"],
         },
         "warming": {
             "warm_duration_seconds": WARM_DURATION,
-            "warmed_sessions": list(WARMED_SESSIONS.keys())[:10]  # First 10 only
+            "warmed_sessions_count": get_warm_count()
+        },
+        "config": {
+            "max_concurrent": CONFIG["MAX_CONCURRENT"],
+            "max_requests_per_proxy": CONFIG["MAX_REQUESTS_PER_PROXY"],
+            "proxy_rest_time": CONFIG["PROXY_REST_TIME"],
+            "smart_rotation_enabled": CONFIG["ENABLE_SMART_ROTATION"]
         }
     })
 
