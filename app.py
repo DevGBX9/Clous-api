@@ -27,6 +27,9 @@ import httpx
 from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 
+# Import unified search system
+from unified_search import unified_search, SearchMode
+
 sys.dont_write_bytecode = True
 
 # ==========================================
@@ -663,618 +666,74 @@ async def check_username(
 
 
 # ==========================================
-#     SMART SEARCH WITH DYNAMIC IDENTITIES
+#     SEARCH FUNCTIONS (Using Unified Search)
 # ==========================================
 async def stealth_search() -> Dict[str, Any]:
-    """
-    Search with DYNAMIC IDENTITIES:
-    - Fresh identities generated for EACH /search request
-    - Each proxy gets 2 identities for rotation
-    - Rate-limited proxies are skipped automatically
-    """
-    start_time = time.time()
-    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0}
-    
-    if not PROXIES:
-        return {"status": "failed", "reason": "no_proxies", "duration": 0}
-    
-    # Create FRESH session manager with NEW identities
-    manager = DynamicSessionManager(PROXIES)
-    available_proxies = manager.get_available_proxies()
-    
-    if not available_proxies:
-        return {
-            "status": "failed", 
-            "reason": "all_proxies_rate_limited", 
-            "duration": 0,
-            "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
-        }
-    
-    logger.info(f"� Starting search with {len(available_proxies)} proxies (fresh dual identities!)")
-    
-    while time.time() - start_time < CONFIG["TIMEOUT"]:
-        # Limit concurrent requests
-        proxies_to_use = available_proxies[:CONFIG["MAX_CONCURRENT"]]
-        
-        if not proxies_to_use:
-            logger.warning("No available proxies! Waiting...")
-            await asyncio.sleep(5)
-            # Refresh available proxies
-            available_proxies = [p for p in manager.proxies_with_identities if is_proxy_available(p.proxy_url)]
-            continue
-        
-        # Generate usernames
-        usernames = [generate_simple_username() for _ in range(len(proxies_to_use))]
-        
-        # Create tasks
-        tasks = []
-        for proxy_with_id, username in zip(proxies_to_use, usernames):
-            client = await manager.get_client(proxy_with_id.proxy_url)
-            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
-        
-        # Process results as they come in
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            stats["checked"] += 1
-            
-            if result["status"] == "available":
-                # Found! Cancel remaining and return
-                for t in tasks:
-                    t.cancel()
-                
-                duration = round(time.time() - start_time, 2)
-                
-                logger.info(f"✅ FOUND: {result['username']} in {duration}s")
-                
-                # Close clients in background (don't wait)
-                asyncio.create_task(manager.close_all())
-                
-                return {
-                    "status": "success",
-                    "username": result["username"],
-                    "duration": duration,
-                    "stats": stats,
-                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-                    "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
-                }
-                
-            elif result["status"] == "taken":
-                stats["taken"] += 1
-            elif result["status"] in ["rate_limit", "challenge"]:
-                stats["rate_limits"] += 1
-            else:
-                stats["errors"] += 1
-        
-        # Human-like delay between batches
-        await human_delay()
-    
-    # Timeout
-    # Close clients in background
-    asyncio.create_task(manager.close_all())
-    return {
-        "status": "failed",
-        "reason": "timeout",
-        "duration": round(time.time() - start_time, 2),
-        "stats": stats,
-        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-        "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
-    }
+    """Quick search with simple usernames (5 chars). Uses unified search system."""
+    return await unified_search(
+        mode=SearchMode.SIMPLE,
+        detailed_logging=False,
+        proxies=PROXIES,
+        config=CONFIG,
+        session_manager_class=DynamicSessionManager,
+        username_generator_simple=generate_simple_username,
+        username_generator_semi_quad=generate_semi_quad_username,
+        check_username_func=check_username,
+        is_proxy_available_func=is_proxy_available,
+        get_rate_limited_count_func=get_rate_limited_count,
+        get_warm_count_func=get_warm_count,
+    )
 
 
-# ==========================================
-#     SEMI-QUAD SEARCH (FOR /prosearch) - FAST MODE
-# ==========================================
 async def semi_quad_stealth_search() -> Dict[str, Any]:
-    """
-    FAST Search for SEMI-QUAD usernames only.
-    NO DELAYS - Maximum speed for quick results.
-    """
-    start_time = time.time()
-    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0}
-    
-    # FAST MODE CONFIG
-    FAST_MAX_CONCURRENT = 50  # Use more proxies at once
-    FAST_TIMEOUT = 30  # Max 30 seconds
-    
-    if not PROXIES:
-        return {"status": "failed", "reason": "no_proxies", "duration": 0}
-    
-    # Create FRESH session manager with NEW identities
-    manager = DynamicSessionManager(PROXIES)
-    available_proxies = manager.get_available_proxies()
-    
-    if not available_proxies:
-        return {
-            "status": "failed", 
-            "reason": "all_proxies_rate_limited", 
-            "duration": 0,
-            "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
-        }
-    
-    logger.info(f"� Starting FAST SEMI-QUAD search with {len(available_proxies)} proxies")
-    
-    while time.time() - start_time < FAST_TIMEOUT:
-        # Use MORE proxies at once for speed
-        proxies_to_use = available_proxies[:FAST_MAX_CONCURRENT]
-        
-        if not proxies_to_use:
-            logger.warning("No available proxies! Waiting...")
-            await asyncio.sleep(2)  # Shorter wait
-            # Refresh available proxies
-            available_proxies = [p for p in manager.proxies_with_identities if is_proxy_available(p.proxy_url)]
-            continue
-        
-        # Generate SEMI-QUAD usernames (with _ or .)
-        usernames = [generate_semi_quad_username() for _ in range(len(proxies_to_use))]
-        
-        # Create tasks
-        tasks = []
-        for proxy_with_id, username in zip(proxies_to_use, usernames):
-            client = await manager.get_client(proxy_with_id.proxy_url)
-            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
-        
-        # Process results as they come in
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            stats["checked"] += 1
-            
-            if result["status"] == "available":
-                # Found! Cancel remaining and return
-                for t in tasks:
-                    t.cancel()
-                
-                duration = round(time.time() - start_time, 2)
-                
-                logger.info(f"✅ FOUND SEMI-QUAD: {result['username']} in {duration}s")
-                
-                # Close clients in background (don't wait)
-                asyncio.create_task(manager.close_all())
-                
-                return {
-                    "status": "success",
-                    "username": result["username"],
-                    "type": "semi-quad",
-                    "duration": duration,
-                    "stats": stats,
-                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-                    "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
-                }
-                
-            elif result["status"] == "taken":
-                stats["taken"] += 1
-            elif result["status"] in ["rate_limit", "challenge"]:
-                stats["rate_limits"] += 1
-            else:
-                stats["errors"] += 1
-        
-        # NO DELAY - Go immediately to next batch for maximum speed!
-    
-    # Timeout
-    # Close clients in background
-    asyncio.create_task(manager.close_all())
-    return {
-        "status": "failed",
-        "reason": "timeout",
-        "duration": round(time.time() - start_time, 2),
-        "stats": stats,
-        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-        "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
-    }
+    """Fast search for semi-quad usernames (with _ or .). Uses unified search system."""
+    return await unified_search(
+        mode=SearchMode.SEMI_QUAD,
+        detailed_logging=False,
+        proxies=PROXIES,
+        config=CONFIG,
+        session_manager_class=DynamicSessionManager,
+        username_generator_simple=generate_simple_username,
+        username_generator_semi_quad=generate_semi_quad_username,
+        check_username_func=check_username,
+        is_proxy_available_func=is_proxy_available,
+        get_rate_limited_count_func=get_rate_limited_count,
+        get_warm_count_func=get_warm_count,
+    )
 
 
-# ==========================================
-#     DETAILED SEARCH (FOR DEBUGGING)
-# ==========================================
 async def detailed_stealth_search() -> Dict[str, Any]:
-    """
-    Same as stealth_search but with EXTREMELY DETAILED logging.
-    Uses the new DYNAMIC IDENTITY system.
-    """
-    start_time = time.time()
-    
-    # Detailed log for everything
-    detailed_log = {
-        "timeline": [],
-        "identities_created": [],
-        "requests_made": [],
-        "delays_applied": [],
-        "rate_limits_detected": [],
-        "usernames_checked": [],
-        "responses_received": [],
-    }
-    
-    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0, "timeouts": 0}
-    
-    def log_event(event_type: str, data: Dict[str, Any]):
-        """Log an event with timestamp."""
-        elapsed = round(time.time() - start_time, 4)
-        detailed_log["timeline"].append({
-            "time": elapsed,
-            "event": event_type,
-            "data": data
-        })
-    
-    if not PROXIES:
-        return {"status": "failed", "reason": "no_proxies", "detailed_log": detailed_log}
-    
-    log_event("INIT", {
-        "proxies_count": len(PROXIES), 
-        "warm_sessions": get_warm_count(),
-        "config": CONFIG
-    })
-    
-    # Create FRESH session manager with NEW identities
-    manager = DynamicSessionManager(PROXIES)
-    available_proxies = manager.get_available_proxies()
-    
-    # Log all created identities
-    for proxy_with_id in available_proxies:
-        identity1 = proxy_with_id.identity1
-        identity2 = proxy_with_id.identity2
-        identity_info = {
-            "proxy": proxy_with_id.proxy_url[:50] + "...",
-            "identity1": {
-                "device": identity1["device"]["model"],
-                "device_id": identity1["device_id"],
-                "guid": identity1["guid"][:12] + "...",
-            },
-            "identity2": {
-                "device": identity2["device"]["model"],
-                "device_id": identity2["device_id"],
-                "guid": identity2["guid"][:12] + "...",
-            },
-        }
-        detailed_log["identities_created"].append(identity_info)
-    
-    log_event("IDENTITIES_CREATED", {
-        "count": len(available_proxies),
-        "total_identities": len(available_proxies) * 2,
-    })
-    
-    batch_number = 0
-    
-    while time.time() - start_time < CONFIG["TIMEOUT"]:
-        batch_number += 1
-        batch_start = time.time()
-        
-        # Get available proxies
-        current_available = [p for p in available_proxies if is_proxy_available(p.proxy_url)]
-        
-        log_event("BATCH_START", {
-            "batch": batch_number,
-            "available_proxies": len(current_available),
-            "rate_limited_proxies": get_rate_limited_count(),
-        })
-        
-        if not current_available:
-            log_event("ALL_RATE_LIMITED", {"waiting": 5})
-            await asyncio.sleep(5)
-            continue
-        
-        # Limit concurrent
-        proxies_to_use = current_available[:CONFIG["MAX_CONCURRENT"]]
-        
-        # Generate usernames
-        usernames = [generate_simple_username() for _ in range(len(proxies_to_use))]
-        
-        log_event("USERNAMES_GENERATED", {
-            "count": len(usernames),
-            "samples": usernames[:5],
-        })
-        
-        # Create and track tasks
-        tasks = []
-        
-        for i, (proxy_with_id, username) in enumerate(zip(proxies_to_use, usernames)):
-            client = await manager.get_client(proxy_with_id.proxy_url)
-            identity = proxy_with_id.get_current_identity()
-            
-            # Log request details
-            request_info = {
-                "index": i,
-                "username": username,
-                "proxy": proxy_with_id.proxy_url[:40] + "...",
-                "device": identity["device"]["model"],
-                "identity_num": proxy_with_id.current_identity + 1,
-                "headers_sample": {
-                    "User-Agent": identity["headers"]["User-Agent"][:60] + "...",
-                    "X-IG-Device-ID": identity["headers"]["X-IG-Device-ID"][:20] + "...",
-                }
-            }
-            detailed_log["requests_made"].append(request_info)
-            
-            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
-        
-        log_event("REQUESTS_SENT", {"count": len(tasks)})
-        
-        # Process results
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            stats["checked"] += 1
-            
-            response_info = {
-                "username": result.get("username"),
-                "status": result["status"],
-                "response_preview": result.get("response", result.get("error", ""))[:100] if result.get("response") or result.get("error") else None,
-            }
-            detailed_log["responses_received"].append(response_info)
-            detailed_log["usernames_checked"].append(result.get("username"))
-            
-            if result["status"] == "available":
-                for t in tasks:
-                    t.cancel()
-                
-                duration = round(time.time() - start_time, 4)
-                
-                log_event("FOUND_AVAILABLE", {
-                    "username": result["username"],
-                    "total_checked": stats["checked"],
-                    "duration": duration,
-                })
-                
-                # Close clients in background (don't wait)
-                log_event("CLEANUP", {"closing_clients": len(manager.clients)})
-                asyncio.create_task(manager.close_all())
-                
-                return {
-                    "status": "success",
-                    "username": result["username"],
-                    "duration": duration,
-                    "stats": stats,
-                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-                    "batches_processed": batch_number,
-                    "detailed_log": detailed_log,
-                }
-                
-            elif result["status"] == "taken":
-                stats["taken"] += 1
-            elif result["status"] == "rate_limit":
-                stats["rate_limits"] += 1
-                detailed_log["rate_limits_detected"].append(result.get("username"))
-            elif result["status"] == "timeout":
-                stats["timeouts"] += 1
-            else:
-                stats["errors"] += 1
-        
-        # Apply human delay
-        if random.random() < 0.1:
-            delay = random.uniform(2.0, 4.0)
-        else:
-            delay = random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
-        
-        await asyncio.sleep(delay)
-        
-        delay_info = {
-            "batch": batch_number,
-            "delay_seconds": round(delay, 3),
-            "batch_duration": round(time.time() - batch_start, 3),
-        }
-        detailed_log["delays_applied"].append(delay_info)
-        
-        log_event("BATCH_END", delay_info)
-    
-    # Timeout
-    log_event("CLEANUP", {"closing_clients": len(manager.clients)})
-    asyncio.create_task(manager.close_all())
-    return {
-        "status": "failed",
-        "reason": "timeout",
-        "duration": round(time.time() - start_time, 2),
-        "stats": stats,
-        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-        "batches_processed": batch_number,
-        "detailed_log": detailed_log,
-    }
+    """Detailed search with full logging for debugging. Uses unified search system."""
+    return await unified_search(
+        mode=SearchMode.SIMPLE,
+        detailed_logging=True,
+        proxies=PROXIES,
+        config=CONFIG,
+        session_manager_class=DynamicSessionManager,
+        username_generator_simple=generate_simple_username,
+        username_generator_semi_quad=generate_semi_quad_username,
+        check_username_func=check_username,
+        is_proxy_available_func=is_proxy_available,
+        get_rate_limited_count_func=get_rate_limited_count,
+        get_warm_count_func=get_warm_count,
+    )
 
 
-# ==========================================
-#     DETAILED SEMI-QUAD SEARCH (FOR /infoprosearch)
-# ==========================================
 async def detailed_semi_quad_stealth_search() -> Dict[str, Any]:
-    """
-    Same as detailed_stealth_search but for SEMI-QUAD usernames.
-    Uses generate_semi_quad_username instead of generate_simple_username.
-    """
-    start_time = time.time()
-    
-    # Detailed log for everything
-    detailed_log = {
-        "timeline": [],
-        "identities_created": [],
-        "requests_made": [],
-        "delays_applied": [],
-        "rate_limits_detected": [],
-        "usernames_checked": [],
-        "responses_received": [],
-    }
-    
-    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0, "timeouts": 0}
-    
-    def log_event(event_type: str, data: Dict[str, Any]):
-        """Log an event with timestamp."""
-        elapsed = round(time.time() - start_time, 4)
-        detailed_log["timeline"].append({
-            "time": elapsed,
-            "event": event_type,
-            "data": data
-        })
-    
-    if not PROXIES:
-        return {"status": "failed", "reason": "no_proxies", "detailed_log": detailed_log}
-    
-    log_event("INIT", {
-        "proxies_count": len(PROXIES), 
-        "warm_sessions": get_warm_count(),
-        "config": CONFIG,
-        "search_type": "SEMI-QUAD"
-    })
-    
-    # Create FRESH session manager with NEW identities
-    manager = DynamicSessionManager(PROXIES)
-    available_proxies = manager.get_available_proxies()
-    
-    # Log all created identities
-    for proxy_with_id in available_proxies:
-        identity1 = proxy_with_id.identity1
-        identity2 = proxy_with_id.identity2
-        identity_info = {
-            "proxy": proxy_with_id.proxy_url[:50] + "...",
-            "identity1": {
-                "device": identity1["device"]["model"],
-                "device_id": identity1["device_id"],
-                "guid": identity1["guid"][:12] + "...",
-            },
-            "identity2": {
-                "device": identity2["device"]["model"],
-                "device_id": identity2["device_id"],
-                "guid": identity2["guid"][:12] + "...",
-            },
-        }
-        detailed_log["identities_created"].append(identity_info)
-    
-    log_event("IDENTITIES_CREATED", {
-        "count": len(available_proxies),
-        "total_identities": len(available_proxies) * 2,
-    })
-    
-    batch_number = 0
-    
-    while time.time() - start_time < CONFIG["TIMEOUT"]:
-        batch_number += 1
-        batch_start = time.time()
-        
-        # Get available proxies
-        current_available = [p for p in available_proxies if is_proxy_available(p.proxy_url)]
-        
-        log_event("BATCH_START", {
-            "batch": batch_number,
-            "available_proxies": len(current_available),
-            "rate_limited_proxies": get_rate_limited_count(),
-        })
-        
-        if not current_available:
-            log_event("ALL_RATE_LIMITED", {"waiting": 5})
-            await asyncio.sleep(5)
-            continue
-        
-        # Limit concurrent
-        proxies_to_use = current_available[:CONFIG["MAX_CONCURRENT"]]
-        
-        # Generate SEMI-QUAD usernames
-        usernames = [generate_semi_quad_username() for _ in range(len(proxies_to_use))]
-        
-        log_event("USERNAMES_GENERATED", {
-            "count": len(usernames),
-            "samples": usernames[:5],
-            "type": "semi-quad"
-        })
-        
-        # Create and track tasks
-        tasks = []
-        
-        for i, (proxy_with_id, username) in enumerate(zip(proxies_to_use, usernames)):
-            client = await manager.get_client(proxy_with_id.proxy_url)
-            identity = proxy_with_id.get_current_identity()
-            
-            # Log request details
-            request_info = {
-                "index": i,
-                "username": username,
-                "proxy": proxy_with_id.proxy_url[:40] + "...",
-                "device": identity["device"]["model"],
-                "identity_num": proxy_with_id.current_identity + 1,
-                "headers_sample": {
-                    "User-Agent": identity["headers"]["User-Agent"][:60] + "...",
-                    "X-IG-Device-ID": identity["headers"]["X-IG-Device-ID"][:20] + "...",
-                }
-            }
-            detailed_log["requests_made"].append(request_info)
-            
-            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
-        
-        log_event("REQUESTS_SENT", {"count": len(tasks)})
-        
-        # Process results
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            stats["checked"] += 1
-            
-            response_info = {
-                "username": result.get("username"),
-                "status": result["status"],
-                "response_preview": result.get("response", result.get("error", ""))[:100] if result.get("response") or result.get("error") else None,
-            }
-            detailed_log["responses_received"].append(response_info)
-            detailed_log["usernames_checked"].append(result.get("username"))
-            
-            if result["status"] == "available":
-                for t in tasks:
-                    t.cancel()
-                
-                duration = round(time.time() - start_time, 4)
-                
-                log_event("FOUND_AVAILABLE", {
-                    "username": result["username"],
-                    "total_checked": stats["checked"],
-                    "duration": duration,
-                    "type": "semi-quad"
-                })
-                
-                # Close clients in background (don't wait)
-                log_event("CLEANUP", {"closing_clients": len(manager.clients)})
-                asyncio.create_task(manager.close_all())
-                
-                return {
-                    "status": "success",
-                    "username": result["username"],
-                    "type": "semi-quad",
-                    "duration": duration,
-                    "stats": stats,
-                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-                    "batches_processed": batch_number,
-                    "detailed_log": detailed_log,
-                }
-                
-            elif result["status"] == "taken":
-                stats["taken"] += 1
-            elif result["status"] == "rate_limit":
-                stats["rate_limits"] += 1
-                detailed_log["rate_limits_detected"].append(result.get("username"))
-            elif result["status"] == "timeout":
-                stats["timeouts"] += 1
-            else:
-                stats["errors"] += 1
-        
-        # Apply human delay
-        if random.random() < 0.1:
-            delay = random.uniform(2.0, 4.0)
-        else:
-            delay = random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
-        
-        await asyncio.sleep(delay)
-        
-        delay_info = {
-            "batch": batch_number,
-            "delay_seconds": round(delay, 3),
-            "batch_duration": round(time.time() - batch_start, 3),
-        }
-        detailed_log["delays_applied"].append(delay_info)
-        
-        log_event("BATCH_END", delay_info)
-    
-    # Timeout
-    log_event("CLEANUP", {"closing_clients": len(manager.clients)})
-    asyncio.create_task(manager.close_all())
-    return {
-        "status": "failed",
-        "reason": "timeout",
-        "type": "semi-quad",
-        "duration": round(time.time() - start_time, 2),
-        "stats": stats,
-        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
-        "batches_processed": batch_number,
-        "detailed_log": detailed_log,
-    }
+    """Detailed semi-quad search with full logging. Uses unified search system."""
+    return await unified_search(
+        mode=SearchMode.SEMI_QUAD,
+        detailed_logging=True,
+        proxies=PROXIES,
+        config=CONFIG,
+        session_manager_class=DynamicSessionManager,
+        username_generator_simple=generate_simple_username,
+        username_generator_semi_quad=generate_semi_quad_username,
+        check_username_func=check_username,
+        is_proxy_available_func=is_proxy_available,
+        get_rate_limited_count_func=get_rate_limited_count,
+        get_warm_count_func=get_warm_count,
+    )
 
 
 # ==========================================
