@@ -1132,9 +1132,16 @@ def status():
 
 
 @app.route('/warm')
-async def warm():
+def warm():
     """Manually warm all proxy sessions."""
-    await warm_all_sessions_background()
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    loop.run_until_complete(warm_all_sessions_background())
     return jsonify({
         "status": "success",
         "message": "All sessions warmed with advanced multi-endpoint warming",
@@ -1142,36 +1149,64 @@ async def warm():
     })
 
 @app.route('/search')
-async def search():
+def search():
     """
     Find one available username with IMPOSSIBLE TO RATE LIMIT stealth.
     Smart Probability: 70% Simple Search (5 chars), 30% Pro Search (Semi-Quad).
     """
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
     if random.random() < 0.7:
-        result = await stealth_search()
+        result = loop.run_until_complete(stealth_search())
     else:
-        result = await semi_quad_stealth_search()
+        result = loop.run_until_complete(semi_quad_stealth_search())
     
     return jsonify(result)
 
 @app.route('/infosearch')
-async def info_search():
+def info_search():
     """Find one available username with EXTREMELY DETAILED logging."""
-    result = await detailed_stealth_search()
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    result = loop.run_until_complete(detailed_stealth_search())
     return jsonify(result)
 
 
 @app.route('/prosearch')
-async def pro_search():
+def pro_search():
     """Find one available SEMI-QUAD username (with _ or . in allowed positions)."""
-    result = await semi_quad_stealth_search()
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    result = loop.run_until_complete(semi_quad_stealth_search())
     return jsonify(result)
 
 
 @app.route('/infoprosearch')
-async def info_pro_search():
+def info_pro_search():
     """Find one available SEMI-QUAD username with EXTREMELY DETAILED logging."""
-    result = await detailed_semi_quad_stealth_search()
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    result = loop.run_until_complete(detailed_semi_quad_stealth_search())
     return jsonify(result)
 
 # ==========================================
