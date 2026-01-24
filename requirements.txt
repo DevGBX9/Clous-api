@@ -1,3 +1,4 @@
-flask[async]
+flask
 flask-cors
-httpx
+curl_cffi
+numpy
