@@ -33,8 +33,16 @@ from dataclasses import dataclass, field
 from collections import OrderedDict
 from http.cookies import SimpleCookie
 
-# USE curl_cffi for TLS fingerprint randomization
-from curl_cffi.requests import AsyncSession
+# TLS Fingerprint: Try curl_cffi first, fallback to httpx for Railway compatibility
+try:
+    from curl_cffi.requests import AsyncSession as CurlAsyncSession
+    USE_CURL_CFFI = True
+    logger_init_msg = "Using curl_cffi for TLS fingerprint randomization"
+except ImportError:
+    USE_CURL_CFFI = False
+    logger_init_msg = "curl_cffi not available, using httpx (reduced stealth)"
+
+import httpx
 from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 from enum import Enum
@@ -521,47 +529,67 @@ WARM_ENDPOINTS_ADVANCED = [
 async def warm_single_session_advanced(proxy_url: str) -> bool:
     """
     Advanced session warming - simulates real app behavior.
-    Uses curl_cffi with browser impersonation.
+    Uses curl_cffi with browser impersonation (if available).
+    Falls back to httpx for Railway compatibility.
     """
     try:
         session_data = get_or_create_session(proxy_url)
         identity = session_data.identity
         
-        async with AsyncSession(
-            proxy=proxy_url,
-            impersonate=session_data.browser_impersonation,
-            timeout=CONFIG["REQUEST_TIMEOUT"]
-        ) as client:
-            
-            # Randomly choose 1-2 endpoints to warm
-            endpoints_to_use = random.sample(WARM_ENDPOINTS_ADVANCED, k=random.randint(1, 2))
-            
-            for method, url, data in endpoints_to_use:
-                try:
-                    # Add micro-jitter between requests
-                    await asyncio.sleep(micro_jitter())
-                    
-                    headers = identity["headers"].copy()
-                    
-                    if method == "GET":
-                        response = await client.get(url, headers=headers)
-                    else:
-                        post_data = data.copy() if data else {}
-                        post_data["_uuid"] = identity["guid"]
-                        response = await client.post(url, headers=headers, data=post_data)
-                    
-                    # Extract and save cookies
-                    if hasattr(response, 'cookies'):
-                        update_session_cookies(proxy_url, dict(response.cookies))
+        # Randomly choose 1-2 endpoints to warm
+        endpoints_to_use = random.sample(WARM_ENDPOINTS_ADVANCED, k=random.randint(1, 2))
+        
+        if USE_CURL_CFFI:
+            async with CurlAsyncSession(
+                proxy=proxy_url,
+                impersonate=session_data.browser_impersonation,
+                timeout=CONFIG["REQUEST_TIMEOUT"]
+            ) as client:
+                for method, url, data in endpoints_to_use:
+                    try:
+                        await asyncio.sleep(micro_jitter())
+                        headers = identity["headers"].copy()
                         
-                except Exception:
-                    pass  # Ignore individual request failures
-                
-                # Small delay between warming requests
-                await asyncio.sleep(random.uniform(0.2, 0.6))
-            
-            mark_session_warm(proxy_url)
-            return True
+                        if method == "GET":
+                            response = await client.get(url, headers=headers)
+                        else:
+                            post_data = data.copy() if data else {}
+                            post_data["_uuid"] = identity["guid"]
+                            response = await client.post(url, headers=headers, data=post_data)
+                        
+                        if hasattr(response, 'cookies'):
+                            update_session_cookies(proxy_url, dict(response.cookies))
+                    except Exception:
+                        pass
+                    
+                    await asyncio.sleep(random.uniform(0.2, 0.6))
+        else:
+            # Fallback to httpx
+            async with httpx.AsyncClient(
+                proxy=proxy_url,
+                timeout=CONFIG["REQUEST_TIMEOUT"]
+            ) as client:
+                for method, url, data in endpoints_to_use:
+                    try:
+                        await asyncio.sleep(micro_jitter())
+                        headers = identity["headers"].copy()
+                        
+                        if method == "GET":
+                            response = await client.get(url, headers=headers)
+                        else:
+                            post_data = data.copy() if data else {}
+                            post_data["_uuid"] = identity["guid"]
+                            response = await client.post(url, headers=headers, data=post_data)
+                        
+                        if hasattr(response, 'cookies'):
+                            update_session_cookies(proxy_url, dict(response.cookies))
+                    except Exception:
+                        pass
+                    
+                    await asyncio.sleep(random.uniform(0.2, 0.6))
+        
+        mark_session_warm(proxy_url)
+        return True
             
     except Exception as e:
         logger.debug(f"Warm failed for {proxy_url[:30]}: {e}")
@@ -677,7 +705,8 @@ async def check_username_stealth(
 ) -> Dict[str, Any]:
     """
     Check a single username with ULTIMATE STEALTH.
-    Uses curl_cffi for TLS fingerprint randomization.
+    Uses curl_cffi for TLS fingerprint randomization (if available).
+    Falls back to httpx for Railway compatibility.
     IMPROVED: More accurate rate limit detection.
     """
     try:
@@ -698,93 +727,108 @@ async def check_username_stealth(
         # Simulate typing the username
         await simulate_typing_delay(username)
         
-        async with AsyncSession(
-            proxy=proxy_url,
-            impersonate=session_data.browser_impersonation,
-            timeout=CONFIG["REQUEST_TIMEOUT"]
-        ) as client:
-            
-            # Set cookies from session
-            for name, value in session_data.cookies.items():
-                client.cookies.set(name, value)
-            
-            data = {
-                "username": username,
-                "_uuid": identity["guid"],
-            }
-            
-            response = await client.post(
-                CONFIG["API_URL"],
-                headers=identity["headers"],
-                data=data
-            )
-            
-            # Save cookies from response
-            if hasattr(response, 'cookies'):
-                update_session_cookies(proxy_url, dict(response.cookies))
-            
-            # Mark session as warm (successful request)
-            mark_session_warm(proxy_url)
-            
-            text = response.text
-            status_code = response.status_code
-            
-            # ========== ACCURATE RESPONSE DETECTION ==========
-            
-            # Check for available username
-            if '"available":true' in text or '"available": true' in text:
-                mark_proxy_used(proxy_url, success=True)
-                return {"status": "available", "username": username, "proxy": proxy_url}
-            
-            # Check for taken username
-            if '"available":false' in text or '"available": false' in text:
-                mark_proxy_used(proxy_url, success=True)
-                return {"status": "taken", "username": username, "proxy": proxy_url}
-            
-            # Check for EXACT rate limit patterns (be very specific!)
-            is_rate_limited = False
-            matched_pattern = None
-            for pattern in RATE_LIMIT_PATTERNS:
-                if pattern.lower() in text.lower():
-                    is_rate_limited = True
-                    matched_pattern = pattern
-                    break
-            
-            if is_rate_limited:
-                mark_proxy_rate_limited(proxy_url)
-                mark_proxy_used(proxy_url, success=False)
-                logger.warning(f"⚠️ TRUE RATE LIMIT on {proxy_url[:30]}... | Pattern: {matched_pattern}")
-                logger.warning(f"📝 Response: {text[:200]}")
-                return {"status": "rate_limit", "username": username, "proxy": proxy_url, "response": text[:200], "pattern": matched_pattern}
-            
-            # Check for challenge patterns
-            is_challenge = False
-            for pattern in CHALLENGE_PATTERNS:
-                if pattern.lower() in text.lower():
-                    is_challenge = True
-                    break
-            
-            if is_challenge:
-                mark_proxy_rate_limited(proxy_url)
-                mark_proxy_used(proxy_url, success=False)
-                return {"status": "challenge", "username": username, "proxy": proxy_url}
-            
-            # Check for other known responses that are NOT rate limits
-            if status_code == 200 and '"status":"ok"' in text:
-                # Got OK response but no available/taken - might be different format
-                mark_proxy_used(proxy_url, success=True)
-                return {"status": "taken", "username": username, "proxy": proxy_url}
-            
-            # Unknown response - log it but DON'T count as rate limit
-            mark_proxy_used(proxy_url, success=True)  # Still successful request
-            logger.debug(f"Unknown response (NOT rate limit): {text[:100]}")
-            return {"status": "unknown", "username": username, "response": text[:150]}
+        data = {
+            "username": username,
+            "_uuid": identity["guid"],
+        }
+        
+        # ========== MAKE REQUEST (curl_cffi or httpx) ==========
+        if USE_CURL_CFFI:
+            # Use curl_cffi for TLS fingerprinting
+            async with CurlAsyncSession(
+                proxy=proxy_url,
+                impersonate=session_data.browser_impersonation,
+                timeout=CONFIG["REQUEST_TIMEOUT"]
+            ) as client:
+                for name, value in session_data.cookies.items():
+                    client.cookies.set(name, value)
                 
+                response = await client.post(
+                    CONFIG["API_URL"],
+                    headers=identity["headers"],
+                    data=data
+                )
+                
+                if hasattr(response, 'cookies'):
+                    update_session_cookies(proxy_url, dict(response.cookies))
+                
+                text = response.text
+                status_code = response.status_code
+        else:
+            # Fallback to httpx for Railway
+            async with httpx.AsyncClient(
+                proxy=proxy_url,
+                timeout=CONFIG["REQUEST_TIMEOUT"]
+            ) as client:
+                response = await client.post(
+                    CONFIG["API_URL"],
+                    headers=identity["headers"],
+                    data=data
+                )
+                
+                if hasattr(response, 'cookies'):
+                    update_session_cookies(proxy_url, dict(response.cookies))
+                
+                text = response.text
+                status_code = response.status_code
+        
+        # Mark session as warm (successful request)
+        mark_session_warm(proxy_url)
+        
+        # ========== ACCURATE RESPONSE DETECTION ==========
+        
+        # Check for available username
+        if '"available":true' in text or '"available": true' in text:
+            mark_proxy_used(proxy_url, success=True)
+            return {"status": "available", "username": username, "proxy": proxy_url}
+        
+        # Check for taken username
+        if '"available":false' in text or '"available": false' in text:
+            mark_proxy_used(proxy_url, success=True)
+            return {"status": "taken", "username": username, "proxy": proxy_url}
+        
+        # Check for EXACT rate limit patterns (be very specific!)
+        is_rate_limited = False
+        matched_pattern = None
+        for pattern in RATE_LIMIT_PATTERNS:
+            if pattern.lower() in text.lower():
+                is_rate_limited = True
+                matched_pattern = pattern
+                break
+        
+        if is_rate_limited:
+            mark_proxy_rate_limited(proxy_url)
+            mark_proxy_used(proxy_url, success=False)
+            logger.warning(f"⚠️ TRUE RATE LIMIT on {proxy_url[:30]}... | Pattern: {matched_pattern}")
+            logger.warning(f"📝 Response: {text[:200]}")
+            return {"status": "rate_limit", "username": username, "proxy": proxy_url, "response": text[:200], "pattern": matched_pattern}
+        
+        # Check for challenge patterns
+        is_challenge = False
+        for pattern in CHALLENGE_PATTERNS:
+            if pattern.lower() in text.lower():
+                is_challenge = True
+                break
+        
+        if is_challenge:
+            mark_proxy_rate_limited(proxy_url)
+            mark_proxy_used(proxy_url, success=False)
+            return {"status": "challenge", "username": username, "proxy": proxy_url}
+        
+        # Check for other known responses that are NOT rate limits
+        if status_code == 200 and '"status":"ok"' in text:
+            mark_proxy_used(proxy_url, success=True)
+            return {"status": "taken", "username": username, "proxy": proxy_url}
+        
+        # Unknown response - log it but DON'T count as rate limit
+        mark_proxy_used(proxy_url, success=True)
+        logger.debug(f"Unknown response (NOT rate limit): {text[:100]}")
+        return {"status": "unknown", "username": username, "response": text[:150]}
+            
     except asyncio.TimeoutError:
         mark_proxy_used(proxy_url, success=False)
         return {"status": "timeout", "username": username}
     except Exception as e:
-        error_str = str(e).lower()
         # Network errors are NOT rate limits
         mark_proxy_used(proxy_url, success=False)
         return {"status": "network_error", "username": username, "error": str(e)[:80]}
