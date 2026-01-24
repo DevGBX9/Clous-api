@@ -26,9 +26,7 @@ from dataclasses import dataclass, field
 import httpx
 from flask import Flask, jsonify, render_template
 from flask_cors import CORS
-
-# Import unified search system
-from unified_search import unified_search, SearchMode
+from enum import Enum
 
 sys.dont_write_bytecode = True
 
@@ -666,74 +664,203 @@ async def check_username(
 
 
 # ==========================================
-#     SEARCH FUNCTIONS (Using Unified Search)
+#     UNIFIED SEARCH SYSTEM
 # ==========================================
+class SearchMode(Enum):
+    """Search modes for the unified search function."""
+    SIMPLE = "simple"           # 5-char usernames, normal speed with delays
+    SEMI_QUAD = "semi_quad"     # 5-char with _ or ., fast mode no delays
+
+
+async def unified_search(
+    mode: SearchMode,
+    detailed_logging: bool = False
+) -> Dict[str, Any]:
+    """
+    UNIFIED Search Function - Handles all search modes.
+    
+    Args:
+        mode: SearchMode.SIMPLE or SearchMode.SEMI_QUAD
+        detailed_logging: If True, includes extensive debug information
+    """
+    start_time = time.time()
+    
+    # Mode-specific configuration
+    if mode == SearchMode.SEMI_QUAD:
+        username_generator = generate_semi_quad_username
+        max_concurrent = 50
+        timeout = 30
+        apply_delays = False
+        search_type = "semi-quad"
+    else:
+        username_generator = generate_simple_username
+        max_concurrent = CONFIG["MAX_CONCURRENT"]
+        timeout = CONFIG["TIMEOUT"]
+        apply_delays = True
+        search_type = "simple"
+    
+    stats = {"checked": 0, "taken": 0, "errors": 0, "rate_limits": 0}
+    if detailed_logging:
+        stats["timeouts"] = 0
+    
+    detailed_log = None
+    if detailed_logging:
+        detailed_log = {
+            "timeline": [], "identities_created": [], "requests_made": [],
+            "delays_applied": [], "rate_limits_detected": [],
+            "usernames_checked": [], "responses_received": [],
+        }
+        def log_event(event_type: str, data: Dict[str, Any]):
+            detailed_log["timeline"].append({
+                "time": round(time.time() - start_time, 4),
+                "event": event_type, "data": data
+            })
+    else:
+        def log_event(event_type: str, data: Dict[str, Any]):
+            pass
+    
+    if not PROXIES:
+        result = {"status": "failed", "reason": "no_proxies", "duration": 0}
+        if detailed_logging:
+            result["detailed_log"] = detailed_log
+        return result
+    
+    log_event("INIT", {
+        "proxies_count": len(PROXIES), "warm_sessions": get_warm_count(),
+        "search_type": search_type, "mode": mode.value
+    })
+    
+    manager = DynamicSessionManager(PROXIES)
+    available_proxies = manager.get_available_proxies()
+    
+    if not available_proxies:
+        result = {
+            "status": "failed", "reason": "all_proxies_rate_limited",
+            "duration": 0, "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}"
+        }
+        if detailed_logging:
+            result["detailed_log"] = detailed_log
+        return result
+    
+    if detailed_logging:
+        for p in available_proxies:
+            detailed_log["identities_created"].append({
+                "proxy": p.proxy_url[:50] + "...",
+                "identity1": {"device": p.identity1["device"]["model"]},
+                "identity2": {"device": p.identity2["device"]["model"]},
+            })
+    
+    logger.info(f"🔍 Starting {search_type.upper()} search with {len(available_proxies)} proxies")
+    batch_number = 0
+    
+    while time.time() - start_time < timeout:
+        batch_number += 1
+        batch_start = time.time()
+        current_available = [p for p in available_proxies if is_proxy_available(p.proxy_url)]
+        
+        log_event("BATCH_START", {"batch": batch_number, "available": len(current_available)})
+        
+        if not current_available:
+            wait_time = 2 if mode == SearchMode.SEMI_QUAD else 5
+            await asyncio.sleep(wait_time)
+            continue
+        
+        proxies_to_use = current_available[:max_concurrent]
+        usernames = [username_generator() for _ in range(len(proxies_to_use))]
+        
+        tasks = []
+        for i, (proxy_with_id, username) in enumerate(zip(proxies_to_use, usernames)):
+            client = await manager.get_client(proxy_with_id.proxy_url)
+            if detailed_logging:
+                detailed_log["requests_made"].append({"username": username, "proxy": proxy_with_id.proxy_url[:40]})
+            tasks.append(asyncio.create_task(check_username(client, proxy_with_id, username)))
+        
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            stats["checked"] += 1
+            
+            if detailed_logging:
+                detailed_log["responses_received"].append({"username": result.get("username"), "status": result["status"]})
+                detailed_log["usernames_checked"].append(result.get("username"))
+            
+            if result["status"] == "available":
+                for t in tasks:
+                    t.cancel()
+                duration = round(time.time() - start_time, 2 if not detailed_logging else 4)
+                log_event("FOUND", {"username": result["username"], "duration": duration})
+                logger.info(f"✅ FOUND {search_type.upper()}: {result['username']} in {duration}s")
+                asyncio.create_task(manager.close_all())
+                
+                response = {
+                    "status": "success", "username": result["username"],
+                    "duration": duration, "stats": stats,
+                    "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+                    "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
+                }
+                if mode == SearchMode.SEMI_QUAD:
+                    response["type"] = "semi-quad"
+                if detailed_logging:
+                    response["batches_processed"] = batch_number
+                    response["detailed_log"] = detailed_log
+                return response
+            
+            elif result["status"] == "taken":
+                stats["taken"] += 1
+            elif result["status"] in ["rate_limit", "challenge"]:
+                stats["rate_limits"] += 1
+                if detailed_logging:
+                    detailed_log["rate_limits_detected"].append(result.get("username"))
+            elif result["status"] == "timeout":
+                if detailed_logging:
+                    stats["timeouts"] += 1
+                else:
+                    stats["errors"] += 1
+            else:
+                stats["errors"] += 1
+        
+        if apply_delays:
+            delay = random.uniform(2.0, 4.0) if random.random() < 0.1 else random.uniform(CONFIG["MIN_DELAY"], CONFIG["MAX_DELAY"])
+            await asyncio.sleep(delay)
+            if detailed_logging:
+                detailed_log["delays_applied"].append({"batch": batch_number, "delay": round(delay, 3)})
+    
+    asyncio.create_task(manager.close_all())
+    response = {
+        "status": "failed", "reason": "timeout",
+        "duration": round(time.time() - start_time, 2), "stats": stats,
+        "rate_limited_proxies": f"{get_rate_limited_count()}/{len(PROXIES)}",
+        "warm_sessions": f"{get_warm_count()}/{len(PROXIES)}"
+    }
+    if mode == SearchMode.SEMI_QUAD:
+        response["type"] = "semi-quad"
+    if detailed_logging:
+        response["batches_processed"] = batch_number
+        response["detailed_log"] = detailed_log
+    return response
+
+
+# ==========================================
+#     SEARCH WRAPPERS
+# ==========================================
+
 async def stealth_search() -> Dict[str, Any]:
-    """Quick search with simple usernames (5 chars). Uses unified search system."""
-    return await unified_search(
-        mode=SearchMode.SIMPLE,
-        detailed_logging=False,
-        proxies=PROXIES,
-        config=CONFIG,
-        session_manager_class=DynamicSessionManager,
-        username_generator_simple=generate_simple_username,
-        username_generator_semi_quad=generate_semi_quad_username,
-        check_username_func=check_username,
-        is_proxy_available_func=is_proxy_available,
-        get_rate_limited_count_func=get_rate_limited_count,
-        get_warm_count_func=get_warm_count,
-    )
+    """Quick search with simple usernames (5 chars)."""
+    return await unified_search(mode=SearchMode.SIMPLE, detailed_logging=False)
 
 
 async def semi_quad_stealth_search() -> Dict[str, Any]:
-    """Fast search for semi-quad usernames (with _ or .). Uses unified search system."""
-    return await unified_search(
-        mode=SearchMode.SEMI_QUAD,
-        detailed_logging=False,
-        proxies=PROXIES,
-        config=CONFIG,
-        session_manager_class=DynamicSessionManager,
-        username_generator_simple=generate_simple_username,
-        username_generator_semi_quad=generate_semi_quad_username,
-        check_username_func=check_username,
-        is_proxy_available_func=is_proxy_available,
-        get_rate_limited_count_func=get_rate_limited_count,
-        get_warm_count_func=get_warm_count,
-    )
+    """Fast search for semi-quad usernames (with _ or .)."""
+    return await unified_search(mode=SearchMode.SEMI_QUAD, detailed_logging=False)
 
 
 async def detailed_stealth_search() -> Dict[str, Any]:
-    """Detailed search with full logging for debugging. Uses unified search system."""
-    return await unified_search(
-        mode=SearchMode.SIMPLE,
-        detailed_logging=True,
-        proxies=PROXIES,
-        config=CONFIG,
-        session_manager_class=DynamicSessionManager,
-        username_generator_simple=generate_simple_username,
-        username_generator_semi_quad=generate_semi_quad_username,
-        check_username_func=check_username,
-        is_proxy_available_func=is_proxy_available,
-        get_rate_limited_count_func=get_rate_limited_count,
-        get_warm_count_func=get_warm_count,
-    )
+    """Detailed search with full logging for debugging."""
+    return await unified_search(mode=SearchMode.SIMPLE, detailed_logging=True)
 
 
 async def detailed_semi_quad_stealth_search() -> Dict[str, Any]:
-    """Detailed semi-quad search with full logging. Uses unified search system."""
-    return await unified_search(
-        mode=SearchMode.SEMI_QUAD,
-        detailed_logging=True,
-        proxies=PROXIES,
-        config=CONFIG,
-        session_manager_class=DynamicSessionManager,
-        username_generator_simple=generate_simple_username,
-        username_generator_semi_quad=generate_semi_quad_username,
-        check_username_func=check_username,
-        is_proxy_available_func=is_proxy_available,
-        get_rate_limited_count_func=get_rate_limited_count,
-        get_warm_count_func=get_warm_count,
-    )
+    """Detailed semi-quad search with full logging."""
+    return await unified_search(mode=SearchMode.SEMI_QUAD, detailed_logging=True)
 
 
 # ==========================================
